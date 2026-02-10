@@ -33,6 +33,11 @@ scripts/bootstrap_venv.sh
 source backend/.venv/bin/activate
 ```
 
+## Backend Tests (Per Worktree)
+```bash
+scripts/run_backend_pytest.sh
+```
+
 ## Local Run
 ### Option 1: Docker Compose
 ```bash

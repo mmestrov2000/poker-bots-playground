@@ -14,5 +14,6 @@ Scope:
 
 Requirements:
 - Run and report lint/test/validation checks.
+- Run backend tests via `scripts/run_backend_pytest.sh` for consistent environment and imports.
 - Verify Docker and docs are consistent with actual behavior.
 - Summarize release readiness, known risks, and go/no-go recommendation.

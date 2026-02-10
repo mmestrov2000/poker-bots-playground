@@ -17,4 +17,5 @@ Requirements:
 - Keep API and frontend behavior aligned with acceptance criteria.
 - Update task statuses in `TASKS.md` as items complete.
 - Add integration/UI smoke tests where practical.
+- Run tests via `scripts/run_backend_pytest.sh` (do not call raw `pytest` without `PYTHONPATH`).
 - Summarize completed scope and remaining follow-ups.

@@ -11,7 +11,13 @@ git status
 ```
 
 ### 1.1 Set the correct GitHub remote
-Current `origin` points to the template repo and must be replaced.
+If `origin` does not exist yet, add it:
+
+```bash
+git remote add origin <YOUR_GITHUB_REPO_URL>
+```
+
+If `origin` already exists but points to the wrong repository, replace it:
 
 ```bash
 git remote set-url origin <YOUR_GITHUB_REPO_URL>

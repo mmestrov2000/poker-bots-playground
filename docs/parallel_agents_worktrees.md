@@ -19,6 +19,14 @@ sudo apt install gh
 gh auth login
 ```
 
+## Python Dependencies (Per Worktree)
+Each worktree has its own `backend/` folder. Use a per-worktree virtual environment to avoid missing deps:
+
+```bash
+scripts/bootstrap_venv.sh
+source backend/.venv/bin/activate
+```
+
 ## Automation Scripts
 - Start worktree + branch:
   - `scripts/agent_worktree_start.sh --agent <agent-name> --task <task-id> --base marin`

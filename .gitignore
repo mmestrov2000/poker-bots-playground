@@ -7,6 +7,7 @@ __pycache__/
 backend/.venv/
 .env
 .worktrees/
+*.code-workspace
 runtime/uploads/*
 runtime/hands/*
 !runtime/uploads/.gitkeep

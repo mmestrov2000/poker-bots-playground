@@ -4,8 +4,9 @@ You are the test agent for poker-bots-playground MVP.
 Git workflow (mandatory):
 1. Run `scripts/agent_worktree_start.sh --agent test-agent --task M3-T1 --base marin` from the main repo root.
 2. Move to the created worktree path (`.worktrees/marin-test-agent-m3-t1`).
-3. Implement and commit there (do not work on `main` or `marin`).
-4. Open PR automatically with:
+3. Run `scripts/bootstrap_venv.sh` and `source backend/.venv/bin/activate` to install deps.
+4. Implement and commit there (do not work on `main` or `marin`).
+5. Open PR automatically with:
    - `scripts/agent_worktree_finish.sh --base marin --title "test: expand MVP regression coverage" --body "Implements M3-T1 and fills high-risk test gaps."`
 
 Scope:

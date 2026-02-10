@@ -27,6 +27,12 @@ Web playground for heads-up No-Limit Texas Hold'em bot battles.
 - Push and create PR: `scripts/agent_worktree_finish.sh --base marin --title "<PR title>" --body "<PR summary>"`
 - Detailed runbook: `docs/parallel_agents_worktrees.md`
 
+## Python Setup (Per Worktree)
+```bash
+scripts/bootstrap_venv.sh
+source backend/.venv/bin/activate
+```
+
 ## Local Run
 ### Option 1: Docker Compose
 ```bash

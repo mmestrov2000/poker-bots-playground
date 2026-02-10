@@ -23,3 +23,4 @@
 - Agents must create branches/worktrees using `scripts/agent_worktree_start.sh`.
 - Agents must push and create PRs using `scripts/agent_worktree_finish.sh`.
 - Follow `docs/parallel_agents_worktrees.md` for end-to-end command flow.
+- For Python dependencies, use `scripts/bootstrap_venv.sh` in each worktree.

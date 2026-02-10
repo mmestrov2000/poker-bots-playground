@@ -40,7 +40,7 @@ No scoped work is allowed directly on `main` or `marin`.
 ### Feature Agent (M1)
 ```bash
 scripts/agent_worktree_start.sh --agent feature-agent --task M1 --base marin
-cd ../worktrees/marin-feature-agent-m1
+cd .worktrees/marin-feature-agent-m1
 # implement + commit
 scripts/agent_worktree_finish.sh --base marin --title "feat: implement M1 engine/runtime" --body "Implements M1-T1..M1-T5 with tests and TASKS updates."
 ```
@@ -48,7 +48,7 @@ scripts/agent_worktree_finish.sh --base marin --title "feat: implement M1 engine
 ### Feature Agent (M2)
 ```bash
 scripts/agent_worktree_start.sh --agent feature-agent --task M2 --base marin
-cd ../worktrees/marin-feature-agent-m2
+cd .worktrees/marin-feature-agent-m2
 # implement + commit
 scripts/agent_worktree_finish.sh --base marin --title "feat: implement M2 API and UI" --body "Implements M2-T1..M2-T5 with tests and TASKS updates."
 ```
@@ -56,7 +56,7 @@ scripts/agent_worktree_finish.sh --base marin --title "feat: implement M2 API an
 ### Test Agent
 ```bash
 scripts/agent_worktree_start.sh --agent test-agent --task M3-T1 --base marin
-cd ../worktrees/marin-test-agent-m3-t1
+cd .worktrees/marin-test-agent-m3-t1
 # implement + commit
 scripts/agent_worktree_finish.sh --base marin --title "test: expand MVP regression coverage" --body "Implements M3-T1 coverage for engine/API failure paths."
 ```
@@ -64,7 +64,7 @@ scripts/agent_worktree_finish.sh --base marin --title "test: expand MVP regressi
 ### Review Agent
 ```bash
 scripts/agent_worktree_start.sh --agent review-agent --task M1-M2-review --base marin
-cd ../worktrees/marin-review-agent-m1-m2-review
+cd .worktrees/marin-review-agent-m1-m2-review
 # add review artifacts/changes + commit
 scripts/agent_worktree_finish.sh --base marin --title "review: M1/M2 risk findings" --body "Documents M1-T6 and M2-T6 findings with file references."
 ```
@@ -72,7 +72,7 @@ scripts/agent_worktree_finish.sh --base marin --title "review: M1/M2 risk findin
 ### Release Agent
 ```bash
 scripts/agent_worktree_start.sh --agent release-agent --task M3-release --base marin
-cd ../worktrees/marin-release-agent-m3-release
+cd .worktrees/marin-release-agent-m3-release
 # release checks + commit
 scripts/agent_worktree_finish.sh --base marin --title "release: MVP readiness checks" --body "Executes M3-T4/M3-T5 checks and readiness report."
 ```

@@ -6,6 +6,7 @@ __pycache__/
 .coverage
 backend/.venv/
 .env
+.worktrees/
 runtime/uploads/*
 runtime/hands/*
 !runtime/uploads/.gitkeep

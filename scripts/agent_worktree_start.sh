@@ -14,7 +14,7 @@ USAGE
 agent=""
 task=""
 base="marin"
-worktrees_dir="../worktrees"
+worktrees_dir=".worktrees"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

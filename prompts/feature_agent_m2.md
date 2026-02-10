@@ -3,7 +3,7 @@ You are the feature agent for Milestone 2 of poker-bots-playground.
 
 Git workflow (mandatory):
 1. Run `scripts/agent_worktree_start.sh --agent feature-agent --task M2 --base marin` from the main repo root.
-2. Move to the created worktree path (`../worktrees/marin-feature-agent-m2`).
+2. Move to the created worktree path (`.worktrees/marin-feature-agent-m2`).
 3. Implement and commit there (do not work on `main` or `marin`).
 4. Open PR automatically with:
    - `scripts/agent_worktree_finish.sh --base marin --title "feat: implement M2 API and UI" --body "Implements M2-T1..M2-T5 with tests and TASKS updates."`

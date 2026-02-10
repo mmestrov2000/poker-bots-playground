@@ -1,27 +1,42 @@
-# Project Template
+# Poker Bots Playground
 
-This repository is a reusable project starter for teams using Codex.
+Web playground for heads-up No-Limit Texas Hold'em bot battles.
 
-## What You Get
-- Standard repo structure
-- Canonical documents: spec, architecture, tasks
-- Prompt templates for specialized agents
-- Minimal workflows and scripts placeholders
+## MVP Features
+- Two bot upload seats (`A` and `B`) in a web UI.
+- Automatic match start once both bots are uploaded.
+- Continuous hand simulation with random outcomes.
+- Append-only hand list with per-hand text history view.
+- Containerized runtime for local development and VPS deployment.
 
-## Quick Start (New Project)
-1. Create a new repo from this GitHub template.
-2. Open the repo locally in VS Code.
-3. Start a main Codex session and run the `prompts/main_agent_bootstrap.md` prompt.
-4. The main agent produces `PROJECT_SPEC.md`, `ARCHITECTURE.md`, and `TASKS.md` and initializes files.
-5. Push `main` and let each developer branch from it.
+## Project Docs
+- `PROJECT_SPEC.md`
+- `ARCHITECTURE.md`
+- `TASKS.md`
+- `docs/parallel_agents_worktrees.md`
 
-## Repository Structure
-- `PROJECT_SPEC.md` - canonical spec and acceptance criteria
-- `ARCHITECTURE.md` - architecture and folder layout
-- `TASKS.md` - task breakdown and ownership
-- `AGENTS.md` - agent roles and usage
-- `prompts/` - copy/paste prompts for each agent
-- `docs/` - team docs and decisions
-- `scripts/` - repo helper scripts
-- `.github/workflows/` - CI skeleton
+## Local Run
+### Option 1: Docker Compose
+```bash
+docker compose up --build
+```
 
+Open `http://localhost:8000`.
+
+### Option 2: Python (backend + static frontend)
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+PYTHONPATH=. uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Open `http://localhost:8000`.
+
+## Bot Upload Contract
+Upload `.zip` with `bot.py` at root and class `PokerBot`.
+See `bot_template/README.md`.
+
+## Current State
+This repo contains MVP bootstrap scaffolding. Core NLHE rules and robust bot sandboxing are tracked in `TASKS.md`.

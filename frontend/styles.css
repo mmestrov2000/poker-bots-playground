@@ -1,0 +1,115 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --border: #d8d8d1;
+  --text: #20221d;
+  --muted: #52574d;
+  --accent: #1f6a4f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top right, #f5edd7, var(--bg) 45%);
+  color: var(--text);
+}
+
+.layout {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+h1,
+h2 {
+  margin: 0 0 0.5rem;
+}
+
+p {
+  margin: 0;
+}
+
+.seats {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.seat-card,
+.match-controls,
+.hands-list,
+.hand-detail {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.seat-card,
+.match-controls {
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+button {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:hover {
+  filter: brightness(1.05);
+}
+
+button:disabled {
+  background: #9ea7a3;
+  cursor: not-allowed;
+}
+
+.hands-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-height: 120px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.hands-list li {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.hands-list li:last-child {
+  border-bottom: 0;
+}
+
+.hands-list button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.hand-detail {
+  margin: 0;
+  padding: 1rem;
+  min-height: 220px;
+  max-height: 420px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: var(--muted);
+}

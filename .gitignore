@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+backend/.venv/
+.env
+runtime/uploads/*
+runtime/hands/*
+!runtime/uploads/.gitkeep
+!runtime/hands/.gitkeep

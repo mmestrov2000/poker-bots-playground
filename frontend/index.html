@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Poker Bots Playground</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <header>
+        <h1>Poker Bots Playground</h1>
+        <p>Heads-up No-Limit Texas Hold'em bot battle.</p>
+      </header>
+
+      <section class="seats">
+        <article class="seat-card">
+          <h2>Seat A</h2>
+          <p id="seat-a-status">Status: empty</p>
+          <input id="seat-a-file" type="file" accept=".zip" />
+          <button id="seat-a-upload">Upload Bot</button>
+        </article>
+
+        <article class="seat-card">
+          <h2>Seat B</h2>
+          <p id="seat-b-status">Status: empty</p>
+          <input id="seat-b-file" type="file" accept=".zip" />
+          <button id="seat-b-upload">Upload Bot</button>
+        </article>
+      </section>
+
+      <section class="match-controls">
+        <button id="reset-match">Reset Match</button>
+        <p id="match-status">Match: waiting</p>
+      </section>
+
+      <section>
+        <h2>Hands Played</h2>
+        <ul id="hands-list" class="hands-list"></ul>
+      </section>
+
+      <section>
+        <h2>Hand Detail</h2>
+        <pre id="hand-detail" class="hand-detail">Select a hand to view full history.</pre>
+      </section>
+    </main>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>

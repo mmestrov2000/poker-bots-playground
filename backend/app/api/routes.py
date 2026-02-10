@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from app.bots.loader import BotLoadError, save_upload
+from app.bots.validator import validate_bot_archive
 from app.services.match_service import MatchService
 from app.storage.hand_store import HandStore
 
@@ -38,6 +39,10 @@ async def upload_bot(seat_id: str, bot_file: UploadFile = File(...)) -> dict:
     payload = await bot_file.read()
     if len(payload) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Upload exceeds 10MB limit")
+
+    is_valid, error_message = validate_bot_archive(payload)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message or "Invalid bot archive")
 
     bot_path = save_upload(
         seat_id=normalized_seat,

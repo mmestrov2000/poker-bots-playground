@@ -31,19 +31,19 @@ Goal: lock MVP scope and create initial runnable scaffold.
 ## Milestone 1: Game Engine and Bot Runtime
 Goal: run valid heads-up NLHE hands between uploaded bots.
 
-- [ ] `M1-T1` Implement core heads-up NLHE hand state model (owner: `feature-agent`)
+- [x] `M1-T1` Implement core heads-up NLHE hand state model (owner: `feature-agent`)
   - Acceptance: Engine tracks blinds, stacks, betting rounds, pot, board, and showdown state.
   - Test Strategy: Unit tests for transitions across preflop/flop/turn/river.
-- [ ] `M1-T2` Implement legal action validation and bet sizing rules (owner: `feature-agent`)
+- [x] `M1-T2` Implement legal action validation and bet sizing rules (owner: `feature-agent`)
   - Acceptance: Illegal actions are rejected or normalized by explicit fallback rules.
   - Test Strategy: Unit tests for fold/check/call/bet/raise edge cases.
-- [ ] `M1-T3` Implement secure bot loader and `act()` invocation wrapper (owner: `feature-agent`)
+- [x] `M1-T3` Implement secure bot loader and `act()` invocation wrapper (owner: `feature-agent`)
   - Acceptance: Bot class is loaded from upload package; timeout/error handling is enforced.
   - Test Strategy: Unit tests for valid bot, timeout bot, exception bot, malformed bot.
-- [ ] `M1-T4` Integrate match loop to produce completed hand records (owner: `feature-agent`)
+- [x] `M1-T4` Integrate match loop to produce completed hand records (owner: `feature-agent`)
   - Acceptance: With two bots loaded, loop generates sequential hand ids and results.
   - Test Strategy: Integration test for match start and first N completed hands.
-- [ ] `M1-T5` Generate readable `.txt` hand history formatter (owner: `feature-agent`)
+- [x] `M1-T5` Generate readable `.txt` hand history formatter (owner: `feature-agent`)
   - Acceptance: Each completed hand has standard, human-readable text output.
   - Test Strategy: Snapshot tests for representative hand histories.
 - [ ] `M1-T6` Review M1 implementation changes and request fixes (owner: `review-agent`)

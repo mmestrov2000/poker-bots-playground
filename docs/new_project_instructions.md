@@ -36,6 +36,15 @@ This file describes exactly how to start a new project using the template repo a
 7. Open a new Codex session and select the `test-agent` skill for additional test coverage if needed.
 8. Open a new Codex session and select the `release-agent` skill before merging to `main`.
 
+## Parallel Agent Workflow (recommended)
+1. Use `marin` as integration branch for concurrent work.
+2. For each agent session, create a dedicated worktree branch via:
+   - `scripts/agent_worktree_start.sh --agent <agent-name> --task <task-id> --base marin`
+3. Complete work in that worktree and commit changes.
+4. Open PR automatically via:
+   - `scripts/agent_worktree_finish.sh --base marin --title "<PR title>" --body "<PR summary>"`
+5. Merge agent PRs into `marin`, then open PR from `marin` to `main`.
+
 ## Notes
 - Always use one Codex session per agent role.
 - If skills are unavailable, use prompt files in `prompts/` instead.

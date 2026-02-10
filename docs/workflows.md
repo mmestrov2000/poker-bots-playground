@@ -20,4 +20,6 @@
 
 ## Parallel Agent Workflow
 - For simultaneous multi-agent execution, use git worktrees.
-- Follow `docs/parallel_agents_worktrees.md` for branch strategy and prompts.
+- Agents must create branches/worktrees using `scripts/agent_worktree_start.sh`.
+- Agents must push and create PRs using `scripts/agent_worktree_finish.sh`.
+- Follow `docs/parallel_agents_worktrees.md` for end-to-end command flow.

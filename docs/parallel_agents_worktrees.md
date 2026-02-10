@@ -1,177 +1,91 @@
-# Parallel Agent Workflow with Git Worktrees
+# Parallel Agent Workflow with Git Worktrees (Automated)
 
-This runbook lets you run multiple Codex agent sessions at the same time without branch conflicts.
+This workflow is mandatory for parallel agent execution.
+Each agent creates its own branch/worktree and opens its own PR automatically.
 
-## 1) Repository and Branch Setup
-
-Run from the main repo directory:
-
-```bash
-git status
-```
-
-### 1.1 Set the correct GitHub remote
-If `origin` does not exist yet, add it:
+## Prerequisites
+- Base integration branch exists on remote: `marin`.
+- GitHub remote is configured as `origin`.
+- GitHub CLI is installed and authenticated:
 
 ```bash
-git remote add origin <YOUR_GITHUB_REPO_URL>
+gh auth status
 ```
 
-If `origin` already exists but points to the wrong repository, replace it:
+If needed:
 
 ```bash
-git remote set-url origin <YOUR_GITHUB_REPO_URL>
+sudo apt install gh
+gh auth login
 ```
 
-Example:
+## Automation Scripts
+- Start worktree + branch:
+  - `scripts/agent_worktree_start.sh --agent <agent-name> --task <task-id> --base marin`
+- Push + open PR:
+  - `scripts/agent_worktree_finish.sh --base marin --title "<PR title>" --body "<PR summary>"`
+
+## Required Flow Per Agent Session
+1. Start from the main repo checkout.
+2. Create a dedicated worktree branch with `agent_worktree_start.sh`.
+3. `cd` into the printed worktree path.
+4. Implement scope and commit changes.
+5. Run tests/validation relevant to the change.
+6. Run `agent_worktree_finish.sh` to push and create PR.
+
+No scoped work is allowed directly on `main` or `marin`.
+
+## Example Commands by Agent
+
+### Feature Agent (M1)
+```bash
+scripts/agent_worktree_start.sh --agent feature-agent --task M1 --base marin
+cd ../worktrees/marin-feature-agent-m1
+# implement + commit
+scripts/agent_worktree_finish.sh --base marin --title "feat: implement M1 engine/runtime" --body "Implements M1-T1..M1-T5 with tests and TASKS updates."
+```
+
+### Feature Agent (M2)
+```bash
+scripts/agent_worktree_start.sh --agent feature-agent --task M2 --base marin
+cd ../worktrees/marin-feature-agent-m2
+# implement + commit
+scripts/agent_worktree_finish.sh --base marin --title "feat: implement M2 API and UI" --body "Implements M2-T1..M2-T5 with tests and TASKS updates."
+```
+
+### Test Agent
+```bash
+scripts/agent_worktree_start.sh --agent test-agent --task M3-T1 --base marin
+cd ../worktrees/marin-test-agent-m3-t1
+# implement + commit
+scripts/agent_worktree_finish.sh --base marin --title "test: expand MVP regression coverage" --body "Implements M3-T1 coverage for engine/API failure paths."
+```
+
+### Review Agent
+```bash
+scripts/agent_worktree_start.sh --agent review-agent --task M1-M2-review --base marin
+cd ../worktrees/marin-review-agent-m1-m2-review
+# add review artifacts/changes + commit
+scripts/agent_worktree_finish.sh --base marin --title "review: M1/M2 risk findings" --body "Documents M1-T6 and M2-T6 findings with file references."
+```
+
+### Release Agent
+```bash
+scripts/agent_worktree_start.sh --agent release-agent --task M3-release --base marin
+cd ../worktrees/marin-release-agent-m3-release
+# release checks + commit
+scripts/agent_worktree_finish.sh --base marin --title "release: MVP readiness checks" --body "Executes M3-T4/M3-T5 checks and readiness report."
+```
+
+## Merge Integration
+- Merge agent PRs into `marin`.
+- After `marin` is stable, open PR from `marin` to `main`.
+
+## Cleanup
+After merged branches are no longer needed:
 
 ```bash
-git remote set-url origin git@github.com:mmestrov2000/poker-bots-playground.git
-```
-
-### 1.2 Push bootstrap on `main`
-
-```bash
-git push -u origin main
-```
-
-### 1.3 Create and push development branch `marin`
-
-```bash
-git switch -c marin
-git push -u origin marin
-```
-
-## 2) Worktree Layout
-
-Create sibling worktree directories so each agent has its own branch and working copy:
-
-```bash
-mkdir -p ../worktrees
-git worktree add ../worktrees/marin-feature-a -b marin-m1-engine marin
-git worktree add ../worktrees/marin-feature-b -b marin-m2-ui marin
-git worktree add ../worktrees/marin-test -b marin-tests marin
-git worktree add ../worktrees/marin-review -b marin-review marin
-git worktree add ../worktrees/marin-release -b marin-release marin
-```
-
-Recommended mapping:
-- `marin-m1-engine`: `feature-agent` for M1 tasks.
-- `marin-m2-ui`: `feature-agent` for M2 tasks.
-- `marin-tests`: `test-agent` for M3-T1 and test hardening.
-- `marin-review`: `review-agent` for milestone reviews.
-- `marin-release`: `release-agent` for CI/release prep.
-
-## 3) Agent Prompt Templates
-
-Open each worktree in its own IDE window/session and start the matching agent.
-
-### 3.1 Feature Agent Prompt (M1)
-
-```text
-[$feature-agent](skills/feature-agent/SKILL.md)
-You are implementing Milestone 1 tasks from TASKS.md.
-
-Scope:
-- M1-T1, M1-T2, M1-T3, M1-T4, M1-T5
-
-Requirements:
-- Follow PROJECT_SPEC.md and ARCHITECTURE.md.
-- Keep commits scoped and small.
-- Update TASKS.md status for completed items.
-- Add/extend backend tests.
-- Summarize remaining gaps.
-```
-
-### 3.2 Feature Agent Prompt (M2)
-
-```text
-[$feature-agent](skills/feature-agent/SKILL.md)
-You are implementing Milestone 2 tasks from TASKS.md.
-
-Scope:
-- M2-T1, M2-T2, M2-T3, M2-T4, M2-T5
-
-Requirements:
-- Follow PROJECT_SPEC.md and ARCHITECTURE.md.
-- Keep API and UI behavior aligned with acceptance criteria.
-- Update TASKS.md status for completed items.
-- Add integration/UI smoke tests where applicable.
-- Summarize follow-up items.
-```
-
-### 3.3 Test Agent Prompt
-
-```text
-[$test-agent](skills/test-agent/SKILL.md)
-You are improving test coverage for poker-bots-playground MVP.
-
-Scope:
-- M3-T1 and any uncovered critical paths from M1/M2.
-
-Requirements:
-- Prioritize engine correctness, API failure cases, and regressions.
-- Add tests for bot upload validation and match loop behavior.
-- Update TASKS.md statuses relevant to testing work.
-- Report uncovered risk areas.
-```
-
-### 3.4 Review Agent Prompt
-
-```text
-[$review-agent](skills/review-agent/SKILL.md)
-Review the branch changes against PROJECT_SPEC.md, ARCHITECTURE.md, and TASKS.md.
-
-Scope:
-- M1-T6 and M2-T6 review responsibilities.
-
-Requirements:
-- Findings first: bugs, regressions, missing tests, security risks.
-- Include file references for each issue.
-- Distinguish must-fix from follow-up.
-```
-
-### 3.5 Release Agent Prompt
-
-```text
-[$release-agent](skills/release-agent/SKILL.md)
-Validate release readiness for MVP.
-
-Scope:
-- M3-T4, M3-T5
-
-Requirements:
-- Run lint/test/CI-equivalent checks.
-- Validate Docker compose run path and docs accuracy.
-- Summarize readiness, residual risks, and go/no-go recommendation.
-```
-
-## 4) Merge Strategy
-
-Use `marin` as integration branch for your work:
-
-```bash
-# Example from main repo checkout on branch marin
-git switch marin
-git pull
-
-git merge --no-ff marin-m1-engine
-git merge --no-ff marin-m2-ui
-git merge --no-ff marin-tests
-git merge --no-ff marin-review
-git merge --no-ff marin-release
-
-git push origin marin
-```
-
-After validation, create PR from `marin` to `main`.
-
-## 5) Worktree Cleanup (after merge)
-
-```bash
-git worktree remove ../worktrees/marin-feature-a
-git worktree remove ../worktrees/marin-feature-b
-git worktree remove ../worktrees/marin-test
-git worktree remove ../worktrees/marin-review
-git worktree remove ../worktrees/marin-release
+git worktree list
+git worktree remove <worktree-path>
+git branch -d <branch-name>
 ```

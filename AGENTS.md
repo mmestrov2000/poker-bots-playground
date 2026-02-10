@@ -39,3 +39,17 @@ Responsibilities:
 - Run test/lint/CI checks.
 - Verify docs and versioning.
 - Summarize readiness and risks.
+
+## Mandatory Git Workflow (All Agents Except Main Bootstrap on `main`)
+Every execution window for `feature-agent`, `test-agent`, `review-agent`, and `release-agent` must use a dedicated git worktree branch and open a PR automatically.
+
+Required commands:
+- Start worktree and branch:
+  - `scripts/agent_worktree_start.sh --agent <agent-name> --task <task-id> --base marin`
+- Finish and open PR:
+  - `scripts/agent_worktree_finish.sh --base marin --title "<PR title>" --body "<PR summary>"`
+
+Rules:
+- Do not implement scoped feature work directly on `main` or `marin`.
+- One worktree branch per agent scope (or per task when split finer).
+- A branch is considered complete only after PR creation succeeds.

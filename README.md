@@ -15,6 +15,13 @@ Web playground for heads-up No-Limit Texas Hold'em bot battles.
 - `TASKS.md`
 - `docs/parallel_agents_worktrees.md`
 
+## Agent Prompt Presets
+- `prompts/feature_agent_m1.md`
+- `prompts/feature_agent_m2.md`
+- `prompts/test_agent_mvp.md`
+- `prompts/review_agent_milestones.md`
+- `prompts/release_agent_mvp.md`
+
 ## Local Run
 ### Option 1: Docker Compose
 ```bash

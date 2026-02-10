@@ -1,0 +1,4 @@
+interface:
+  display_name: "Main Agent"
+  short_description: "Bootstraps spec, architecture, and tasks"
+  default_prompt: "Use -agent to bootstrap a new project spec."

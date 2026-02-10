@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Agent"
+  short_description: "Validates readiness and summarizes risks"
+  default_prompt: "Use -agent to validate release readiness."

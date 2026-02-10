@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Agent"
+  short_description: "Reviews code for risks and test gaps"
+  default_prompt: "Use -agent to review changes for risks."

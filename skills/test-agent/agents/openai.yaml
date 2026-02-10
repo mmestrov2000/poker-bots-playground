@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test Agent"
+  short_description: "Adds tests for features and regressions"
+  default_prompt: "Use -agent to add or improve tests."

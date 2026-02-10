@@ -2,7 +2,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
-from app.bots.loader import save_upload
+from app.bots.loader import BotLoadError, save_upload
 from app.bots.validator import validate_bot_archive
 from app.services.match_service import MatchService
 from app.storage.hand_store import HandStore
@@ -44,14 +44,17 @@ async def upload_bot(seat_id: str, bot_file: UploadFile = File(...)) -> dict:
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_message or "Invalid bot archive")
 
-    save_upload(
+    bot_path = save_upload(
         seat_id=normalized_seat,
         filename=filename,
         payload=payload,
         uploads_dir=uploads_dir,
     )
 
-    seat = match_service.register_bot(normalized_seat, filename)
+    try:
+        seat = match_service.register_bot(normalized_seat, filename, bot_path=bot_path)
+    except BotLoadError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"seat": seat, "match": match_service.get_match()}
 
 

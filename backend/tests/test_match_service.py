@@ -1,3 +1,4 @@
+import zipfile
 from pathlib import Path
 from time import sleep
 
@@ -5,12 +6,33 @@ from app.services.match_service import MatchService
 from app.storage.hand_store import HandStore
 
 
+def _write_bot_zip(tmp_path: Path, name: str, body: str) -> Path:
+    zip_path = tmp_path / name
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("bot.py", body)
+    return zip_path
+
+
 def test_registering_both_seats_starts_match(tmp_path: Path) -> None:
     service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
     service.HAND_INTERVAL_SECONDS = 0.05
 
-    service.register_bot("A", "alpha.zip")
-    service.register_bot("B", "beta.zip")
+    bot_body = "\n".join(
+        [
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        if 'check' in state.get('legal_actions', []):",
+            "            return {'action': 'check'}",
+            "        if 'call' in state.get('legal_actions', []):",
+            "            return {'action': 'call'}",
+            "        return {'action': 'fold'}",
+        ]
+    )
+    bot_a = _write_bot_zip(tmp_path, "alpha.zip", bot_body)
+    bot_b = _write_bot_zip(tmp_path, "beta.zip", bot_body)
+
+    service.register_bot("A", "alpha.zip", bot_path=bot_a)
+    service.register_bot("B", "beta.zip", bot_path=bot_b)
 
     sleep(0.15)
     match = service.get_match()
@@ -30,8 +52,22 @@ def test_reset_match_clears_state(tmp_path: Path) -> None:
     service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
     service.HAND_INTERVAL_SECONDS = 0.05
 
-    service.register_bot("A", "alpha.zip")
-    service.register_bot("B", "beta.zip")
+    bot_body = "\n".join(
+        [
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        if 'check' in state.get('legal_actions', []):",
+            "            return {'action': 'check'}",
+            "        if 'call' in state.get('legal_actions', []):",
+            "            return {'action': 'call'}",
+            "        return {'action': 'fold'}",
+        ]
+    )
+    bot_a = _write_bot_zip(tmp_path, "alpha.zip", bot_body)
+    bot_b = _write_bot_zip(tmp_path, "beta.zip", bot_body)
+
+    service.register_bot("A", "alpha.zip", bot_path=bot_a)
+    service.register_bot("B", "beta.zip", bot_path=bot_b)
 
     sleep(0.1)
     service.reset_match()

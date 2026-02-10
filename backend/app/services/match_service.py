@@ -1,9 +1,12 @@
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from random import SystemRandom
 from threading import Event, Lock, Thread, current_thread
 from typing import Literal
 
+from app.bots.loader import load_bot_from_zip
+from app.bots.runtime import BotRunner
+from app.engine.game import PokerEngine
 from app.engine.hand_history import format_hand_history
 from app.storage.hand_store import HandStore
 
@@ -49,9 +52,9 @@ class HandRecord:
 class MatchService:
     HAND_INTERVAL_SECONDS = 1.0
 
-    def __init__(self, hand_store: HandStore) -> None:
+    def __init__(self, hand_store: HandStore, engine: PokerEngine | None = None) -> None:
         self.hand_store = hand_store
-        self._random = SystemRandom()
+        self.engine = engine or PokerEngine()
         self._lock = Lock()
         self._stop_event = Event()
         self._loop_thread: Thread | None = None
@@ -63,6 +66,7 @@ class MatchService:
             "A": SeatState(seat_id="A"),
             "B": SeatState(seat_id="B"),
         }
+        self._bots: dict[SeatId, BotRunner | None] = {"A": None, "B": None}
 
     def get_seats(self) -> list[dict]:
         with self._lock:
@@ -96,12 +100,15 @@ class MatchService:
             "history": history_text,
         }
 
-    def register_bot(self, seat_id: SeatId, bot_name: str) -> dict:
+    def register_bot(self, seat_id: SeatId, bot_name: str, bot_path: Path | None = None) -> dict:
         if seat_id not in self._seats:
             raise ValueError(f"Invalid seat id: {seat_id}")
 
         now = datetime.now(timezone.utc)
         with self._lock:
+            if bot_path is not None:
+                bot_instance = load_bot_from_zip(bot_path)
+                self._bots[seat_id] = BotRunner(bot=bot_instance, seat_id=seat_id)
             seat = self._seats[seat_id]
             seat.ready = True
             seat.bot_name = bot_name
@@ -126,6 +133,7 @@ class MatchService:
                 "A": SeatState(seat_id="A"),
                 "B": SeatState(seat_id="B"),
             }
+            self._bots = {"A": None, "B": None}
             self._stop_event.set()
             thread = self._loop_thread
             self._loop_thread = None
@@ -153,27 +161,45 @@ class MatchService:
     def _simulate_hand_locked(self) -> None:
         self._hand_counter += 1
         hand_id = str(self._hand_counter)
-        winner: SeatId = self._random.choice(["A", "B"])
-        pot_size = round(self._random.uniform(1.5, 25.0), 2)
         seat_a_name = self._seats["A"].bot_name or "SeatA-Bot"
         seat_b_name = self._seats["B"].bot_name or "SeatB-Bot"
 
-        history = format_hand_history(
+        bot_a = self._bots["A"]
+        bot_b = self._bots["B"]
+        if bot_a is None or bot_b is None:
+            raise RuntimeError("match loop started without loaded bots")
+
+        result = self.engine.play_hand(
             hand_id=hand_id,
-            winner=winner,
-            pot_size=pot_size,
+            bot_a=bot_a,
+            bot_b=bot_b,
             seat_a_name=seat_a_name,
             seat_b_name=seat_b_name,
         )
+        history = format_hand_history(
+            hand_id=hand_id,
+            winner=result.winner,
+            pot_size_cents=result.pot_cents,
+            seat_a_name=seat_a_name,
+            seat_b_name=seat_b_name,
+            button=self.engine.button_for_hand(hand_id),
+            seat_a_cards=result.hole_cards["A"],
+            seat_b_cards=result.hole_cards["B"],
+            board=result.board,
+            actions=result.actions,
+            small_blind_cents=self.engine.small_blind_cents,
+            big_blind_cents=self.engine.big_blind_cents,
+        )
         history_path = self.hand_store.save_hand(hand_id, history)
 
-        summary = f"Hand #{hand_id}: Seat {winner} won {pot_size:.2f} BB"
+        pot_size = result.pot_cents / 100
+        summary = f"Hand #{hand_id}: Seat {result.winner} won ${pot_size:.2f}"
         self._hands.append(
             HandRecord(
                 hand_id=hand_id,
                 completed_at=datetime.now(timezone.utc),
                 summary=summary,
-                winner=winner,
+                winner=result.winner,
                 pot=pot_size,
                 history_path=str(history_path),
             )

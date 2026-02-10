@@ -8,7 +8,7 @@ fi
 
 REPO="$1"
 
-python3 /home/mmestrov/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
+python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
   --repo "$REPO" \
   --path skills/main-agent \
   --path skills/feature-agent \

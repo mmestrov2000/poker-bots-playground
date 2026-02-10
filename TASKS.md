@@ -53,19 +53,19 @@ Goal: run valid heads-up NLHE hands between uploaded bots.
 ## Milestone 2: API and Web UX
 Goal: provide end-user upload and hand browsing experience.
 
-- [ ] `M2-T1` Implement seat upload and validation endpoints (owner: `feature-agent`)
+- [x] `M2-T1` Implement seat upload and validation endpoints (owner: `feature-agent`)
   - Acceptance: `POST /api/v1/seats/{seat_id}/bot` stores upload, validates shape, updates seat readiness.
   - Test Strategy: API integration tests for valid and invalid uploads.
-- [ ] `M2-T2` Implement match status and reset endpoints (owner: `feature-agent`)
+- [x] `M2-T2` Implement match status and reset endpoints (owner: `feature-agent`)
   - Acceptance: UI can read running state and reset match state safely.
   - Test Strategy: API integration tests for waiting -> running -> reset flow.
-- [ ] `M2-T3` Implement hands list and hand detail endpoints (owner: `feature-agent`)
+- [x] `M2-T3` Implement hands list and hand detail endpoints (owner: `feature-agent`)
   - Acceptance: API returns summaries and per-hand full text by id.
   - Test Strategy: Integration tests for pagination and hand lookup behavior.
-- [ ] `M2-T4` Build frontend upload controls and seat status panels (owner: `feature-agent`)
+- [x] `M2-T4` Build frontend upload controls and seat status panels (owner: `feature-agent`)
   - Acceptance: Users can upload bots into both seats and see status updates.
   - Test Strategy: Browser smoke test for upload flow.
-- [ ] `M2-T5` Build live hand list and hand detail view (owner: `feature-agent`)
+- [x] `M2-T5` Build live hand list and hand detail view (owner: `feature-agent`)
   - Acceptance: New hands appear in order and detail text opens on click.
   - Test Strategy: Browser smoke test for list polling and detail rendering.
 - [ ] `M2-T6` Review M2 API/UI changes and call out regressions (owner: `review-agent`)

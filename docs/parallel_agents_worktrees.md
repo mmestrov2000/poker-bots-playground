@@ -27,6 +27,12 @@ scripts/bootstrap_venv.sh
 source backend/.venv/bin/activate
 ```
 
+Use this test command to avoid import-path issues:
+
+```bash
+scripts/run_backend_pytest.sh
+```
+
 ## Automation Scripts
 - Start worktree + branch:
   - `scripts/agent_worktree_start.sh --agent <agent-name> --task <task-id> --base marin`
@@ -38,7 +44,7 @@ source backend/.venv/bin/activate
 2. Create a dedicated worktree branch with `agent_worktree_start.sh`.
 3. `cd` into the printed worktree path.
 4. Implement scope and commit changes.
-5. Run tests/validation relevant to the change.
+5. Run tests/validation relevant to the change (`scripts/run_backend_pytest.sh` for backend tests).
 6. Run `agent_worktree_finish.sh` to push and create PR.
 
 No scoped work is allowed directly on `main` or `marin`.

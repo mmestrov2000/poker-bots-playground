@@ -9,6 +9,7 @@ required_files=(
   "scripts/agent_worktree_start.sh"
   "scripts/agent_worktree_finish.sh"
   "scripts/bootstrap_venv.sh"
+  "scripts/run_backend_pytest.sh"
 )
 
 missing=0
@@ -23,7 +24,7 @@ if [[ $missing -ne 0 ]]; then
   exit 1
 fi
 
-for f in "scripts/agent_worktree_start.sh" "scripts/agent_worktree_finish.sh" "scripts/bootstrap_venv.sh"; do
+for f in "scripts/agent_worktree_start.sh" "scripts/agent_worktree_finish.sh" "scripts/bootstrap_venv.sh" "scripts/run_backend_pytest.sh"; do
   if [[ ! -x "$f" ]]; then
     echo "Script is not executable: $f"
     missing=1

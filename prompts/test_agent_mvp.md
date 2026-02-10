@@ -15,5 +15,6 @@ Scope:
 Requirements:
 - Prioritize engine correctness, API failure handling, and regression paths.
 - Add tests for upload validation, timeout/error handling, and match lifecycle.
+- Run tests via `scripts/run_backend_pytest.sh` (do not call raw `pytest` without `PYTHONPATH`).
 - Update relevant `TASKS.md` statuses.
 - Summarize residual test gaps.

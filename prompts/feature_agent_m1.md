@@ -17,4 +17,5 @@ Requirements:
 - Keep changes scoped to Milestone 1.
 - Update task statuses in `TASKS.md` as items complete.
 - Add/adjust backend tests for engine and bot runtime behavior.
+- Run tests via `scripts/run_backend_pytest.sh` (do not call raw `pytest` without `PYTHONPATH`).
 - Summarize completed scope and remaining risks.

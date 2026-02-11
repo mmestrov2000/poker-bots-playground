@@ -152,10 +152,17 @@ class MatchService:
 
     def _run_match_loop(self) -> None:
         while not self._stop_event.is_set():
-            with self._lock:
-                if self._status != "running":
-                    return
-                self._simulate_hand_locked()
+            try:
+                with self._lock:
+                    if self._status != "running":
+                        return
+                    self._simulate_hand_locked()
+            except Exception:  # noqa: BLE001 - runtime safeguard for untrusted bot failures
+                with self._lock:
+                    self._status = "waiting"
+                    self._started_at = None
+                self._stop_event.set()
+                return
             self._stop_event.wait(self.HAND_INTERVAL_SECONDS)
 
     def _simulate_hand_locked(self) -> None:

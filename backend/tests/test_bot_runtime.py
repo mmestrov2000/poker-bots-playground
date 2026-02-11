@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 import zipfile
 from pathlib import Path
@@ -7,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from app.bots.loader import BotLoadError, load_bot_from_zip
-from app.bots.runtime import BotRunner
+from app.bots.runtime import MAX_STATE_BYTES, BotRunner
 
 
 def _zip_bot(tmp_path: Path, name: str, body: str) -> Path:
@@ -52,6 +53,15 @@ def test_load_bot_from_zip_missing_class(tmp_path: Path) -> None:
         load_bot_from_zip(zip_path)
 
 
+def test_load_bot_from_zip_rejects_unsafe_archive_path(tmp_path: Path) -> None:
+    zip_path = tmp_path / "bot.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("../bot.py", "class PokerBot: pass")
+
+    with pytest.raises(BotLoadError, match="unsafe paths"):
+        load_bot_from_zip(zip_path)
+
+
 def test_bot_runner_timeout_and_error() -> None:
     class SlowBot:
         def act(self, state):
@@ -82,3 +92,22 @@ def test_bot_runner_invalid_response_falls_back() -> None:
     result = runner.act({"legal_actions": ["check"]})
     assert result["action"] == "fold"
     assert result.get("error") == "invalid_response"
+
+
+def test_bot_runner_rejects_large_state_without_calling_bot() -> None:
+    calls = 0
+
+    class CountingBot:
+        def act(self, state):
+            nonlocal calls
+            calls += 1
+            return {"action": "check"}
+
+    runner = BotRunner(bot=CountingBot(), seat_id="A", timeout_seconds=0.05)
+    huge_state = {"blob": "x" * MAX_STATE_BYTES}
+    assert len(json.dumps(huge_state)) > MAX_STATE_BYTES
+
+    result = runner.act(huge_state)
+    assert result["action"] == "fold"
+    assert result.get("error") == "state_too_large"
+    assert calls == 0

@@ -78,10 +78,10 @@ Goal: make MVP stable and deploy-ready.
 - [x] `M3-T1` Add comprehensive backend test suite for engine and API (owner: `test-agent`)
   - Acceptance: Critical flows and failure paths are covered.
   - Test Strategy: `pytest` suite green locally and in CI.
-- [ ] `M3-T2` Add bot upload constraints and runtime safeguards (owner: `feature-agent`)
+- [x] `M3-T2` Add bot upload constraints and runtime safeguards (owner: `feature-agent`)
   - Acceptance: Upload size limits, extension checks, and execution guardrails are enforced.
   - Test Strategy: Negative tests for oversized and malformed uploads.
-- [ ] `M3-T3` Finalize Docker image and compose workflow (owner: `feature-agent`)
+- [x] `M3-T3` Finalize Docker image and compose workflow (owner: `feature-agent`)
   - Acceptance: `docker compose up --build` boots app with persisted `runtime/` volume.
   - Test Strategy: Manual compose run and health endpoint check.
 - [ ] `M3-T4` Expand CI workflow for lint/test checks (owner: `release-agent`)

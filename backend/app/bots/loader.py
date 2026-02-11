@@ -37,9 +37,9 @@ def load_bot_from_zip(zip_path: Path) -> object:
         except ValueError as exc:
             raise BotLoadError(str(exc)) from exc
 
-    bot_file = extract_dir / "bot.py"
-    if not bot_file.exists():
-        raise BotLoadError("bot.py entrypoint missing")
+    bot_file = _resolve_bot_entrypoint(extract_dir)
+    if bot_file is None:
+        raise BotLoadError("bot.py must exist at zip root or one top-level folder")
 
     module = _load_module(bot_file)
     bot_cls = getattr(module, "PokerBot", None)
@@ -60,3 +60,16 @@ def _load_module(path: Path) -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _resolve_bot_entrypoint(extract_dir: Path) -> Path | None:
+    root_bot = extract_dir / "bot.py"
+    if root_bot.exists():
+        return root_bot
+
+    nested_bots = [path for path in extract_dir.glob("*/bot.py") if path.is_file()]
+    if len(nested_bots) == 1:
+        return nested_bots[0]
+    if len(nested_bots) > 1:
+        raise BotLoadError("Archive contains multiple bot.py candidates")
+    return None

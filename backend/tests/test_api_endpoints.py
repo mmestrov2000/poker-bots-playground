@@ -76,7 +76,24 @@ async def test_upload_rejects_missing_bot_file():
     with pytest.raises(HTTPException) as exc_info:
         await routes.upload_bot("A", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "bot.py must be at the root of the zip"
+    assert exc_info.value.detail == "bot.py must exist at zip root or one top-level folder"
+
+
+@pytest.mark.anyio
+async def test_upload_accepts_bot_file_in_single_top_level_folder():
+    payload = build_zip(
+        {
+            "my_bot/bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+""",
+        }
+    )
+
+    response = await routes.upload_bot("A", build_upload_file("nested.zip", payload))
+    assert response["seat"]["ready"] is True
+    assert response["seat"]["bot_name"] == "nested.zip"
 
 
 @pytest.mark.anyio

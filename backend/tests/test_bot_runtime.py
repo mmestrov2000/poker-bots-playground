@@ -18,6 +18,13 @@ def _zip_bot(tmp_path: Path, name: str, body: str) -> Path:
     return zip_path
 
 
+def _zip_bot_nested(tmp_path: Path, name: str, body: str) -> Path:
+    zip_path = tmp_path / name
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("my_bot/bot.py", body)
+    return zip_path
+
+
 def test_load_bot_from_zip_happy_path(tmp_path: Path) -> None:
     body = "\n".join(
         [
@@ -32,12 +39,26 @@ def test_load_bot_from_zip_happy_path(tmp_path: Path) -> None:
     assert hasattr(bot, "act")
 
 
+def test_load_bot_from_zip_happy_path_nested_entrypoint(tmp_path: Path) -> None:
+    body = "\n".join(
+        [
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        return {'action': 'check'}",
+        ]
+    )
+    zip_path = _zip_bot_nested(tmp_path, "bot.zip", body)
+
+    bot = load_bot_from_zip(zip_path)
+    assert hasattr(bot, "act")
+
+
 def test_load_bot_from_zip_missing_entrypoint(tmp_path: Path) -> None:
     zip_path = tmp_path / "bot.zip"
     with zipfile.ZipFile(zip_path, "w") as archive:
         archive.writestr("readme.txt", "hello")
 
-    with pytest.raises(BotLoadError):
+    with pytest.raises(BotLoadError, match="bot.py must exist"):
         load_bot_from_zip(zip_path)
 
 

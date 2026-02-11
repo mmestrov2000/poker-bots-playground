@@ -85,10 +85,10 @@ scripts/agent_worktree_finish.sh --base marin --title "review: M1/M2 risk findin
 
 ### Release Agent
 ```bash
-scripts/agent_worktree_start.sh --agent release-agent --task M3-release --base marin
-cd .worktrees/marin-release-agent-m3-release
+scripts/agent_worktree_start.sh --agent release-agent --task M3-T4-T5 --base marin
+cd .worktrees/marin-release-agent-m3-t4-t5
 # release checks + commit
-scripts/agent_worktree_finish.sh --base marin --title "release: MVP readiness checks" --body "Executes M3-T4/M3-T5 checks and readiness report."
+scripts/agent_worktree_finish.sh --base marin --title "release: M3-T4/M3-T5 CI and readiness validation" --body "Expands CI checks and documents MVP release readiness, risks, and go/no-go."
 ```
 
 ## Merge Integration

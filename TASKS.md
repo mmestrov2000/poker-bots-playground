@@ -84,10 +84,10 @@ Goal: make MVP stable and deploy-ready.
 - [x] `M3-T3` Finalize Docker image and compose workflow (owner: `feature-agent`)
   - Acceptance: `docker compose up --build` boots app with persisted `runtime/` volume.
   - Test Strategy: Manual compose run and health endpoint check.
-- [ ] `M3-T4` Expand CI workflow for lint/test checks (owner: `release-agent`)
+- [x] `M3-T4` Expand CI workflow for lint/test checks (owner: `release-agent`)
   - Acceptance: CI runs repository validation plus backend tests.
   - Test Strategy: Open PR and confirm CI success.
-- [ ] `M3-T5` Perform release readiness review (owner: `release-agent`)
+- [x] `M3-T5` Perform release readiness review (owner: `release-agent`)
   - Acceptance: Known risks, test results, and deployment notes are documented.
   - Test Strategy: Release checklist review in PR.
 

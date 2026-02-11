@@ -100,3 +100,19 @@ Goal: keep Hand Detail stable until a user selects a different hand.
 - [x] `BF-T2` Clear Hand Detail on match reset or bot re-upload (owner: `feature-agent`)
   - Acceptance: Reset/re-upload returns Hand Detail to the empty prompt and clears selection.
   - Test Strategy: Manual UI check after reset and re-upload.
+
+## Feature: Hand History On-Demand Pagination
+Goal: gate hand history behind a button with snapshot-based pagination and page-size controls.
+
+- [x] `FHH-T1` Add paginated `/hands` API with snapshot boundary (owner: `feature-agent`)
+  - Acceptance: `/hands` supports `page`, `page_size` (100/250/1000), and `max_hand_id`; returns stable slices plus metadata.
+  - Test Strategy: Update/add coverage in `test_match_service.py` and `test_api_endpoints.py`.
+- [x] `FHH-T2` Update frontend to hide hand history until button press and add pagination controls (owner: `feature-agent`)
+  - Acceptance: Hand History button reveals snapshot list; page size menu and prev/next navigation work; hand detail remains unchanged.
+  - Test Strategy: Manual UI smoke test during running match.
+- [x] `FHH-T3` Update API documentation for new `/hands` parameters (owner: `main-agent`)
+  - Acceptance: `PROJECT_SPEC.md` reflects the new query parameters and defaults.
+  - Test Strategy: Doc review.
+- [~] `FHH-T4` Validate and open PR after tests pass (owner: `release-agent`)
+  - Acceptance: `scripts/run_backend_pytest.sh` passes and PR is opened after local validation.
+  - Test Strategy: Attach test output or CI status to PR.

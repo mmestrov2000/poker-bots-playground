@@ -1,4 +1,6 @@
+import math
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
@@ -71,8 +73,27 @@ def reset_match() -> dict:
 
 
 @router.get("/hands")
-def list_hands(limit: int = Query(default=50, ge=1, le=500)) -> dict:
-    return {"hands": match_service.list_hands(limit=limit)}
+def list_hands(
+    limit: Annotated[int | None, Query(ge=1, le=1000)] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=1000)] = 100,
+    max_hand_id: Annotated[int | None, Query(ge=0)] = None,
+) -> dict:
+    if limit is not None:
+        page_size = limit
+        page = 1
+    hands = match_service.list_hands(limit=limit, page=page, page_size=page_size, max_hand_id=max_hand_id)
+    total_hands = match_service.get_match()["hands_played"]
+    if max_hand_id is not None:
+        total_hands = min(max_hand_id, total_hands)
+    total_pages = math.ceil(total_hands / page_size) if total_hands else 0
+    return {
+        "hands": hands,
+        "page": page,
+        "page_size": page_size,
+        "total_hands": total_hands,
+        "total_pages": total_pages,
+    }
 
 
 @router.get("/hands/{hand_id}")

@@ -1,8 +1,9 @@
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
 
-from app.services.match_service import MatchService
+from app.services.match_service import HandRecord, MatchService
 from app.storage.hand_store import HandStore
 
 
@@ -45,7 +46,7 @@ def test_registering_both_seats_starts_match(tmp_path: Path) -> None:
     assert match["status"] == "running"
     assert len(hands) >= 1
 
-    latest_hand = service.get_hand(hands[-1]["hand_id"])
+    latest_hand = service.get_hand(hands[0]["hand_id"])
     assert latest_hand is not None
     assert "Winner: Seat" in (latest_hand["history"] or "")
 
@@ -93,6 +94,33 @@ def test_reset_match_clears_state(tmp_path: Path) -> None:
     assert match["status"] == "waiting"
     assert match["hands_played"] == 0
     assert all(not seat["ready"] for seat in seats)
+
+
+def test_list_hands_paginates_with_snapshot(tmp_path: Path) -> None:
+    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    now = datetime.now(timezone.utc)
+    with service._lock:
+        service._hands = [
+            HandRecord(
+                hand_id=str(hand_id),
+                completed_at=now,
+                summary=f"Hand #{hand_id}",
+                winner="A",
+                pot=1.0,
+                history_path=f"{hand_id}.txt",
+            )
+            for hand_id in range(1, 6)
+        ]
+
+    page_one = service.list_hands(page=1, page_size=2)
+    assert [hand["hand_id"] for hand in page_one] == ["5", "4"]
+    page_two = service.list_hands(page=2, page_size=2)
+    assert [hand["hand_id"] for hand in page_two] == ["3", "2"]
+    page_three = service.list_hands(page=3, page_size=2)
+    assert [hand["hand_id"] for hand in page_three] == ["1"]
+
+    snapshot_page = service.list_hands(page=1, page_size=2, max_hand_id=3)
+    assert [hand["hand_id"] for hand in snapshot_page] == ["3", "2"]
 
 
 def test_match_loop_runtime_error_stops_match_safely(tmp_path: Path) -> None:

@@ -1,6 +1,13 @@
 const apiBase = "/api/v1";
 const handDetailPlaceholder = "Select a hand to view full history.";
 let selectedHandId = null;
+let handHistoryVisible = false;
+let snapshotMaxHandId = null;
+let handsPage = 1;
+let handsPageSize = 100;
+let handsTotalHands = 0;
+let handsTotalPages = 0;
+let latestMatch = null;
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, options);
@@ -36,6 +43,7 @@ function updateSeatStatus(seats) {
 }
 
 function updateMatchStatus(match) {
+  latestMatch = match;
   document.getElementById("match-status").textContent = `Match: ${match.status}, hands played: ${match.hands_played}`;
 }
 
@@ -69,12 +77,20 @@ async function uploadSeat(seatId) {
 
   input.value = "";
   clearHandDetail();
+  clearHandHistory();
   await refreshState();
 }
 
 function renderHands(hands) {
   const list = document.getElementById("hands-list");
   list.innerHTML = "";
+
+  if (!hands.length) {
+    const item = document.createElement("li");
+    item.textContent = "No hands available yet.";
+    list.appendChild(item);
+    return;
+  }
 
   hands.forEach((hand) => {
     const item = document.createElement("li");
@@ -85,6 +101,62 @@ function renderHands(hands) {
     item.appendChild(button);
     list.appendChild(item);
   });
+}
+
+function setHandHistoryVisibility(isVisible) {
+  const list = document.getElementById("hands-list");
+  const controls = document.getElementById("hands-controls");
+  list.classList.toggle("hidden", !isVisible);
+  controls.classList.toggle("hidden", !isVisible);
+}
+
+function updateHandsPagination() {
+  const info = document.getElementById("hands-page-info");
+  const prev = document.getElementById("hands-prev");
+  const next = document.getElementById("hands-next");
+  if (!handHistoryVisible) {
+    info.textContent = "Page 1 of 1";
+    prev.disabled = true;
+    next.disabled = true;
+    return;
+  }
+  if (!handsTotalHands) {
+    info.textContent = "No hands yet.";
+    prev.disabled = true;
+    next.disabled = true;
+    return;
+  }
+  info.textContent = `Page ${handsPage} of ${handsTotalPages}`;
+  prev.disabled = handsPage <= 1;
+  next.disabled = handsPage >= handsTotalPages;
+}
+
+async function loadHandHistoryPage() {
+  if (!handHistoryVisible) {
+    return;
+  }
+  const params = new URLSearchParams();
+  params.set("page", handsPage.toString());
+  params.set("page_size", handsPageSize.toString());
+  if (snapshotMaxHandId !== null) {
+    params.set("max_hand_id", snapshotMaxHandId.toString());
+  }
+  const response = await request(`/hands?${params.toString()}`);
+  handsTotalHands = response.total_hands ?? 0;
+  handsTotalPages = response.total_pages ?? (handsTotalHands ? Math.ceil(handsTotalHands / handsPageSize) : 0);
+  renderHands(response.hands);
+  updateHandsPagination();
+}
+
+async function showHandHistory() {
+  const matchResponse = await request("/match");
+  latestMatch = matchResponse.match;
+  snapshotMaxHandId = latestMatch.hands_played;
+  handHistoryVisible = true;
+  handsPage = 1;
+  handsPageSize = Number(document.getElementById("hands-page-size").value);
+  setHandHistoryVisibility(true);
+  await loadHandHistoryPage();
 }
 
 async function openHand(handId) {
@@ -98,18 +170,25 @@ function clearHandDetail() {
   document.getElementById("hand-detail").textContent = handDetailPlaceholder;
 }
 
+function clearHandHistory() {
+  handHistoryVisible = false;
+  snapshotMaxHandId = null;
+  handsPage = 1;
+  handsTotalHands = 0;
+  handsTotalPages = 0;
+  const list = document.getElementById("hands-list");
+  list.innerHTML = "";
+  setHandHistoryVisibility(false);
+  updateHandsPagination();
+}
+
 async function refreshState() {
   try {
-    const [seats, match, hands] = await Promise.all([
-      request("/seats"),
-      request("/match"),
-      request("/hands?limit=50"),
-    ]);
+    const [seats, match] = await Promise.all([request("/seats"), request("/match")]);
 
     const seatsReady = updateSeatStatus(seats.seats);
     updateMatchStatus(match.match);
     updateMatchControls(match.match, seatsReady);
-    renderHands(hands.hands);
   } catch (error) {
     console.error(error);
   }
@@ -138,6 +217,7 @@ async function endMatch() {
 async function resetMatch() {
   await request("/match/reset", { method: "POST" });
   clearHandDetail();
+  clearHandHistory();
   await refreshState();
 }
 
@@ -155,6 +235,30 @@ function wireEvents() {
   document.getElementById("resume-match").addEventListener("click", () => resumeMatch().catch((error) => alert(error.message)));
   document.getElementById("end-match").addEventListener("click", () => endMatch().catch((error) => alert(error.message)));
   document.getElementById("reset-match").addEventListener("click", () => resetMatch().catch((error) => alert(error.message)));
+  document.getElementById("hand-history-button").addEventListener("click", () => showHandHistory().catch((error) => alert(error.message)));
+  document.getElementById("hands-page-size").addEventListener("change", (event) => {
+    handsPageSize = Number(event.target.value);
+    handsPage = 1;
+    if (handHistoryVisible) {
+      loadHandHistoryPage().catch((error) => alert(error.message));
+    } else {
+      updateHandsPagination();
+    }
+  });
+  document.getElementById("hands-prev").addEventListener("click", () => {
+    if (handsPage > 1) {
+      handsPage -= 1;
+      loadHandHistoryPage().catch((error) => alert(error.message));
+    }
+  });
+  document.getElementById("hands-next").addEventListener("click", () => {
+    if (handsPage < handsTotalPages) {
+      handsPage += 1;
+      loadHandHistoryPage().catch((error) => alert(error.message));
+    }
+  });
+  handsPageSize = Number(document.getElementById("hands-page-size").value);
+  updateHandsPagination();
 }
 
 wireEvents();

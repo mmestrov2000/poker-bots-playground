@@ -189,15 +189,25 @@ class PokerBot:
 
     deadline = time.monotonic() + 2.0
     hands: list[dict] = []
+    hands_response: dict = {}
     while time.monotonic() < deadline:
-        hands = routes.list_hands(limit=5)["hands"]
+        hands_response = routes.list_hands(page=1, page_size=5)
+        hands = hands_response["hands"]
         if hands:
             break
         time.sleep(0.05)
 
     assert hands, "Expected at least one hand to be generated"
+    assert hands_response["page"] == 1
+    assert hands_response["page_size"] == 5
+    assert hands_response["total_hands"] >= len(hands)
+    assert hands_response["total_pages"] >= 1
 
-    latest_hand_id = hands[-1]["hand_id"]
+    snapshot_response = routes.list_hands(page=1, page_size=1, max_hand_id=1)
+    assert snapshot_response["total_hands"] == 1
+    assert snapshot_response["hands"][0]["hand_id"] == "1"
+
+    latest_hand_id = hands[0]["hand_id"]
     detail = routes.get_hand(latest_hand_id)
     assert detail["hand_id"] == latest_hand_id
     assert detail["history"]
@@ -214,7 +224,7 @@ class PokerBot:
     reset_response = routes.reset_match()
     assert reset_response["match"]["status"] == "waiting"
     assert all(not seat["ready"] for seat in routes.get_seats()["seats"])
-    assert routes.list_hands(limit=5)["hands"] == []
+    assert routes.list_hands(page=1, page_size=5)["hands"] == []
 
 
 def test_get_hand_returns_404_for_unknown_hand():

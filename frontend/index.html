@@ -47,8 +47,26 @@
       </section>
 
       <section>
-        <h2>Hands Played</h2>
-        <ul id="hands-list" class="hands-list"></ul>
+        <div class="hands-header">
+          <h2>Hands Played</h2>
+          <button id="hand-history-button" type="button">Hand History</button>
+        </div>
+        <div id="hands-controls" class="hands-controls hidden">
+          <label class="hands-page-size">
+            Hands per page
+            <select id="hands-page-size">
+              <option value="100" selected>100</option>
+              <option value="250">250</option>
+              <option value="1000">1000</option>
+            </select>
+          </label>
+          <div class="hands-pagination">
+            <button id="hands-prev" type="button" disabled>Prev</button>
+            <span id="hands-page-info">Page 1 of 1</span>
+            <button id="hands-next" type="button" disabled>Next</button>
+          </div>
+        </div>
+        <ul id="hands-list" class="hands-list hidden"></ul>
       </section>
 
       <section>

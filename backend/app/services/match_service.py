@@ -82,9 +82,27 @@ class MatchService:
                 "last_hand_id": self._hands[-1].hand_id if self._hands else None,
             }
 
-    def list_hands(self, limit: int = 50) -> list[dict]:
+    def list_hands(
+        self,
+        limit: int | None = None,
+        page: int = 1,
+        page_size: int = 100,
+        max_hand_id: int | None = None,
+    ) -> list[dict]:
         with self._lock:
-            return [record.to_summary_dict() for record in self._hands[-limit:]]
+            total_hands = len(self._hands)
+            snapshot_count = total_hands if max_hand_id is None else min(max_hand_id, total_hands)
+            if limit is not None:
+                page_size = limit
+                page = 1
+            if page_size < 1 or snapshot_count == 0:
+                return []
+            start = max(snapshot_count - (page * page_size), 0)
+            end = snapshot_count - (page - 1) * page_size
+            if end <= 0 or start >= snapshot_count:
+                return []
+            page_records = self._hands[start:end]
+            return [record.to_summary_dict() for record in reversed(page_records)]
 
     def get_hand(self, hand_id: str) -> dict | None:
         with self._lock:

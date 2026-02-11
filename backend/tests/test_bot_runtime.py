@@ -132,3 +132,18 @@ def test_bot_runner_rejects_large_state_without_calling_bot() -> None:
     assert result["action"] == "fold"
     assert result.get("error") == "state_too_large"
     assert calls == 0
+
+
+def test_bot_runner_rejects_invalid_state() -> None:
+    class BadString:
+        def __str__(self) -> str:
+            raise RuntimeError("nope")
+
+    class PassiveBot:
+        def act(self, state):
+            return {"action": "check"}
+
+    runner = BotRunner(bot=PassiveBot(), seat_id="A", timeout_seconds=0.05)
+    result = runner.act({"bad": BadString()})
+    assert result["action"] == "fold"
+    assert result.get("error") == "invalid_state"

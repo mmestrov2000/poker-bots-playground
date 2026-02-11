@@ -16,12 +16,39 @@ function updateSeatStatus(seats) {
   const seatA = byId.A;
   const seatB = byId.B;
 
-  document.getElementById("seat-a-status").textContent = `Status: ${seatA.ready ? `ready (${seatA.bot_name})` : "empty"}`;
-  document.getElementById("seat-b-status").textContent = `Status: ${seatB.ready ? `ready (${seatB.bot_name})` : "empty"}`;
+  const seatReadyA = Boolean(seatA?.ready);
+  const seatReadyB = Boolean(seatB?.ready);
+
+  document.getElementById("seat-a-status").textContent = seatReadyA ? "Seat A taken" : "Seat A empty";
+  document.getElementById("seat-b-status").textContent = seatReadyB ? "Seat B taken" : "Seat B empty";
+
+  const seatAButton = document.getElementById("seat-a-take");
+  const seatBButton = document.getElementById("seat-b-take");
+  const seatAInput = document.getElementById("seat-a-file");
+  const seatBInput = document.getElementById("seat-b-file");
+
+  seatAButton.disabled = seatReadyA;
+  seatBButton.disabled = seatReadyB;
+  seatAInput.disabled = seatReadyA;
+  seatBInput.disabled = seatReadyB;
+
+  return seatReadyA && seatReadyB;
 }
 
 function updateMatchStatus(match) {
   document.getElementById("match-status").textContent = `Match: ${match.status}, hands played: ${match.hands_played}`;
+}
+
+function updateMatchControls(match, seatsReady) {
+  const startButton = document.getElementById("start-match");
+  const pauseButton = document.getElementById("pause-match");
+  const resumeButton = document.getElementById("resume-match");
+  const endButton = document.getElementById("end-match");
+
+  startButton.disabled = !(seatsReady && (match.status === "waiting" || match.status === "stopped"));
+  pauseButton.disabled = match.status !== "running";
+  resumeButton.disabled = match.status !== "paused";
+  endButton.disabled = !(match.status === "running" || match.status === "paused");
 }
 
 async function uploadSeat(seatId) {
@@ -79,12 +106,33 @@ async function refreshState() {
       request("/hands?limit=50"),
     ]);
 
-    updateSeatStatus(seats.seats);
+    const seatsReady = updateSeatStatus(seats.seats);
     updateMatchStatus(match.match);
+    updateMatchControls(match.match, seatsReady);
     renderHands(hands.hands);
   } catch (error) {
     console.error(error);
   }
+}
+
+async function startMatch() {
+  await request("/match/start", { method: "POST" });
+  await refreshState();
+}
+
+async function pauseMatch() {
+  await request("/match/pause", { method: "POST" });
+  await refreshState();
+}
+
+async function resumeMatch() {
+  await request("/match/resume", { method: "POST" });
+  await refreshState();
+}
+
+async function endMatch() {
+  await request("/match/end", { method: "POST" });
+  await refreshState();
 }
 
 async function resetMatch() {
@@ -94,8 +142,18 @@ async function resetMatch() {
 }
 
 function wireEvents() {
-  document.getElementById("seat-a-upload").addEventListener("click", () => uploadSeat("A").catch((error) => alert(error.message)));
-  document.getElementById("seat-b-upload").addEventListener("click", () => uploadSeat("B").catch((error) => alert(error.message)));
+  const seatAInput = document.getElementById("seat-a-file");
+  const seatBInput = document.getElementById("seat-b-file");
+
+  document.getElementById("seat-a-take").addEventListener("click", () => seatAInput.click());
+  document.getElementById("seat-b-take").addEventListener("click", () => seatBInput.click());
+  seatAInput.addEventListener("change", () => uploadSeat("A").catch((error) => alert(error.message)));
+  seatBInput.addEventListener("change", () => uploadSeat("B").catch((error) => alert(error.message)));
+
+  document.getElementById("start-match").addEventListener("click", () => startMatch().catch((error) => alert(error.message)));
+  document.getElementById("pause-match").addEventListener("click", () => pauseMatch().catch((error) => alert(error.message)));
+  document.getElementById("resume-match").addEventListener("click", () => resumeMatch().catch((error) => alert(error.message)));
+  document.getElementById("end-match").addEventListener("click", () => endMatch().catch((error) => alert(error.message)));
   document.getElementById("reset-match").addEventListener("click", () => resetMatch().catch((error) => alert(error.message)));
 }
 

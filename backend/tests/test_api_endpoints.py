@@ -182,7 +182,10 @@ class PokerBot:
     assert response_a["match"]["status"] == "waiting"
 
     response_b = await routes.upload_bot("B", build_upload_file("beta.zip", payload))
-    assert response_b["match"]["status"] == "running"
+    assert response_b["match"]["status"] == "waiting"
+
+    start_response = routes.start_match()
+    assert start_response["match"]["status"] == "running"
 
     deadline = time.monotonic() + 2.0
     hands: list[dict] = []
@@ -198,6 +201,15 @@ class PokerBot:
     detail = routes.get_hand(latest_hand_id)
     assert detail["hand_id"] == latest_hand_id
     assert detail["history"]
+
+    pause_response = routes.pause_match()
+    assert pause_response["match"]["status"] == "paused"
+
+    resume_response = routes.resume_match()
+    assert resume_response["match"]["status"] == "running"
+
+    end_response = routes.end_match()
+    assert end_response["match"]["status"] == "stopped"
 
     reset_response = routes.reset_match()
     assert reset_response["match"]["status"] == "waiting"

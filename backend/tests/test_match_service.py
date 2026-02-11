@@ -34,6 +34,10 @@ def test_registering_both_seats_starts_match(tmp_path: Path) -> None:
     service.register_bot("A", "alpha.zip", bot_path=bot_a)
     service.register_bot("B", "beta.zip", bot_path=bot_b)
 
+    match = service.get_match()
+    assert match["status"] == "waiting"
+
+    service.start_match()
     sleep(0.15)
     match = service.get_match()
     hands = service.list_hands(limit=10)
@@ -44,6 +48,16 @@ def test_registering_both_seats_starts_match(tmp_path: Path) -> None:
     latest_hand = service.get_hand(hands[-1]["hand_id"])
     assert latest_hand is not None
     assert "Winner: Seat" in (latest_hand["history"] or "")
+
+    service.pause_match()
+    assert service.get_match()["status"] == "paused"
+
+    service.resume_match()
+    sleep(0.05)
+    assert service.get_match()["status"] == "running"
+
+    service.end_match()
+    assert service.get_match()["status"] == "stopped"
 
     service.reset_match()
 
@@ -69,6 +83,7 @@ def test_reset_match_clears_state(tmp_path: Path) -> None:
     service.register_bot("A", "alpha.zip", bot_path=bot_a)
     service.register_bot("B", "beta.zip", bot_path=bot_b)
 
+    service.start_match()
     sleep(0.1)
     service.reset_match()
 
@@ -107,6 +122,7 @@ def test_match_loop_runtime_error_stops_match_safely(tmp_path: Path) -> None:
     service.register_bot("A", "alpha.zip", bot_path=bot_a)
     service.register_bot("B", "beta.zip", bot_path=bot_b)
 
+    service.start_match()
     sleep(0.05)
     match = service.get_match()
     assert match["status"] == "waiting"

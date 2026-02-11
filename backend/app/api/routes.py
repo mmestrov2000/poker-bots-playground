@@ -64,6 +64,42 @@ def get_match() -> dict:
     return {"match": match_service.get_match()}
 
 
+@router.post("/match/start")
+def start_match() -> dict:
+    try:
+        match_service.start_match()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"match": match_service.get_match()}
+
+
+@router.post("/match/pause")
+def pause_match() -> dict:
+    try:
+        match_service.pause_match()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"match": match_service.get_match()}
+
+
+@router.post("/match/resume")
+def resume_match() -> dict:
+    try:
+        match_service.resume_match()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"match": match_service.get_match()}
+
+
+@router.post("/match/end")
+def end_match() -> dict:
+    try:
+        match_service.end_match()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"match": match_service.get_match()}
+
+
 @router.post("/match/reset")
 def reset_match() -> dict:
     match_service.reset_match()

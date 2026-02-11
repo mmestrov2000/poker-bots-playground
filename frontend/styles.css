@@ -36,13 +36,7 @@ p {
   margin: 0;
 }
 
-.seats {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-}
-
-.seat-card,
+.table-area,
 .match-controls,
 .hands-list,
 .hand-detail {
@@ -51,11 +45,71 @@ p {
   border-radius: 10px;
 }
 
-.seat-card,
+.table-area,
 .match-controls {
   padding: 1rem;
   display: grid;
   gap: 0.75rem;
+}
+
+.poker-table {
+  position: relative;
+  min-height: 320px;
+  background: radial-gradient(circle at center, #1f7a59 0%, #185643 55%, #123b30 100%);
+  border-radius: 999px;
+  border: 6px solid #c9b27f;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.35);
+}
+
+.table-center {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  background: rgba(10, 24, 20, 0.6);
+  color: #e7f5ed;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.seat {
+  position: absolute;
+  width: min(260px, 70%);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.seat-a {
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.seat-b {
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.seat-status {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.seat-input {
+  display: none;
+}
+
+.seat-button {
+  justify-self: center;
+  width: 70%;
 }
 
 button {
@@ -76,6 +130,26 @@ button:hover {
 button:disabled {
   background: #9ea7a3;
   cursor: not-allowed;
+}
+
+.match-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.button-secondary {
+  background: #2b5a4d;
+}
+
+.button-danger {
+  background: #a43a3a;
+}
+
+.button-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
 }
 
 .hands-list {

@@ -46,7 +46,7 @@ Goal: run valid heads-up NLHE hands between uploaded bots.
 - [x] `M1-T5` Generate readable `.txt` hand history formatter (owner: `feature-agent`)
   - Acceptance: Each completed hand has standard, human-readable text output.
   - Test Strategy: Snapshot tests for representative hand histories.
-- [ ] `M1-T6` Review M1 implementation changes and request fixes (owner: `review-agent`)
+- [x] `M1-T6` Review M1 implementation changes and request fixes (owner: `review-agent`)
   - Acceptance: Critical bugs/risks are documented with file references and required fixes.
   - Test Strategy: Review checklist + targeted rerun of affected tests.
 
@@ -68,7 +68,7 @@ Goal: provide end-user upload and hand browsing experience.
 - [x] `M2-T5` Build live hand list and hand detail view (owner: `feature-agent`)
   - Acceptance: New hands appear in order and detail text opens on click.
   - Test Strategy: Browser smoke test for list polling and detail rendering.
-- [ ] `M2-T6` Review M2 API/UI changes and call out regressions (owner: `review-agent`)
+- [x] `M2-T6` Review M2 API/UI changes and call out regressions (owner: `review-agent`)
   - Acceptance: Review feedback is documented and blocking issues are resolved before merge.
   - Test Strategy: Manual API/UI verification against acceptance criteria.
 

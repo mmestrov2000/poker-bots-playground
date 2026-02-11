@@ -1,12 +1,13 @@
 import io
 import time
 import zipfile
+from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
 
 from app.api import routes
-from app.services.match_service import MatchService
+from app.services.match_service import HandRecord, MatchService
 from app.storage.hand_store import HandStore
 
 
@@ -225,6 +226,40 @@ class PokerBot:
     assert reset_response["match"]["status"] == "waiting"
     assert all(not seat["ready"] for seat in routes.get_seats()["seats"])
     assert routes.list_hands(page=1, page_size=5)["hands"] == []
+
+
+def test_get_pnl_returns_entries_and_last_hand_id():
+    service = routes.match_service
+    now = datetime.now(timezone.utc)
+    with service._lock:
+        service._hands = [
+            HandRecord(
+                hand_id="1",
+                completed_at=now,
+                summary="Hand #1",
+                winner="A",
+                pot=1.0,
+                history_path="1.txt",
+            ),
+            HandRecord(
+                hand_id="2",
+                completed_at=now,
+                summary="Hand #2",
+                winner="B",
+                pot=2.5,
+                history_path="2.txt",
+            ),
+        ]
+
+    response = routes.get_pnl()
+    assert response["last_hand_id"] == 2
+    assert response["entries"] == [
+        {"hand_id": 1, "delta_a": 1.0, "delta_b": -1.0},
+        {"hand_id": 2, "delta_a": -2.5, "delta_b": 2.5},
+    ]
+
+    response = routes.get_pnl(since_hand_id=1)
+    assert response["entries"] == [{"hand_id": 2, "delta_a": -2.5, "delta_b": 2.5}]
 
 
 def test_get_hand_returns_404_for_unknown_hand():

@@ -94,6 +94,7 @@ Runtime behavior:
 - `GET /api/v1/match`
 - `POST /api/v1/match/reset`
 - `GET /api/v1/hands?page=1&page_size=100&max_hand_id=123`
+- `GET /api/v1/pnl?since_hand_id=123`
 - `GET /api/v1/hands/{hand_id}`
 
 ## Acceptance Criteria

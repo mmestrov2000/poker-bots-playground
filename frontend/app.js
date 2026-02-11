@@ -1,5 +1,6 @@
 const apiBase = "/api/v1";
-let latestHandId = null;
+const handDetailPlaceholder = "Select a hand to view full history.";
+let selectedHandId = null;
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, options);
@@ -40,6 +41,7 @@ async function uploadSeat(seatId) {
   });
 
   input.value = "";
+  clearHandDetail();
   await refreshState();
 }
 
@@ -60,12 +62,17 @@ function renderHands(hands) {
 
 async function openHand(handId) {
   const hand = await request(`/hands/${handId}`);
+  selectedHandId = handId;
   document.getElementById("hand-detail").textContent = hand.history || "No hand history available.";
+}
+
+function clearHandDetail() {
+  selectedHandId = null;
+  document.getElementById("hand-detail").textContent = handDetailPlaceholder;
 }
 
 async function refreshState() {
   try {
-    const previousLatestHandId = latestHandId;
     const [seats, match, hands] = await Promise.all([
       request("/seats"),
       request("/match"),
@@ -75,11 +82,6 @@ async function refreshState() {
     updateSeatStatus(seats.seats);
     updateMatchStatus(match.match);
     renderHands(hands.hands);
-
-    latestHandId = hands.hands.length > 0 ? hands.hands[hands.hands.length - 1].hand_id : null;
-    if (latestHandId && previousLatestHandId !== latestHandId) {
-      await openHand(latestHandId);
-    }
   } catch (error) {
     console.error(error);
   }
@@ -87,8 +89,7 @@ async function refreshState() {
 
 async function resetMatch() {
   await request("/match/reset", { method: "POST" });
-  document.getElementById("hand-detail").textContent = "Select a hand to view full history.";
-  latestHandId = null;
+  clearHandDetail();
   await refreshState();
 }
 

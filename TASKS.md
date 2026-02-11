@@ -90,3 +90,13 @@ Goal: make MVP stable and deploy-ready.
 - [ ] `M3-T5` Perform release readiness review (owner: `release-agent`)
   - Acceptance: Known risks, test results, and deployment notes are documented.
   - Test Strategy: Release checklist review in PR.
+
+## Bugfix: Hand Detail Selection
+Goal: keep Hand Detail stable until a user selects a different hand.
+
+- [x] `BF-T1` Stop auto-updating Hand Detail on polling; only update on user selection (owner: `feature-agent`)
+  - Acceptance: Hand Detail stays on the selected hand while new hands are played; initial state stays empty prompt.
+  - Test Strategy: Manual UI check during live polling.
+- [x] `BF-T2` Clear Hand Detail on match reset or bot re-upload (owner: `feature-agent`)
+  - Acceptance: Reset/re-upload returns Hand Detail to the empty prompt and clears selection.
+  - Test Strategy: Manual UI check after reset and re-upload.

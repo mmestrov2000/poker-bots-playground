@@ -1,6 +1,8 @@
 services:
   app:
     build: .
+    environment:
+      - APP_ASSET_VERSION=${APP_ASSET_VERSION:-dev}
     ports:
       - "8000:8000"
     volumes:

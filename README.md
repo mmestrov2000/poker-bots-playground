@@ -46,6 +46,13 @@ docker compose up --build
 
 Open `http://localhost:8000`.
 
+### Asset Versioning (Production)
+Set `APP_ASSET_VERSION` per deployment (for example to a git SHA or release tag) so browsers load new JS/CSS after deploy:
+
+```bash
+APP_ASSET_VERSION=$(git rev-parse --short HEAD) docker compose up --build -d
+```
+
 ### Option 2: Python (backend + static frontend)
 ```bash
 cd backend

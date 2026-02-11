@@ -3,10 +3,20 @@ import time
 import zipfile
 
 import pytest
-from fastapi.testclient import TestClient
+from fastapi import HTTPException
 
-from app.api.routes import match_service
-from app.main import create_app
+from app.api import routes
+from app.services.match_service import MatchService
+from app.storage.hand_store import HandStore
+
+
+class FakeUploadFile:
+    def __init__(self, filename: str, payload: bytes):
+        self.filename = filename
+        self._payload = payload
+
+    async def read(self) -> bytes:
+        return self._payload
 
 
 def build_zip(files: dict[str, str]) -> bytes:
@@ -17,82 +27,98 @@ def build_zip(files: dict[str, str]) -> bytes:
     return buffer.getvalue()
 
 
-def upload_bot(client: TestClient, seat_id: str, payload: bytes, filename: str = "bot.zip"):
-    return client.post(
-        f"/api/v1/seats/{seat_id}/bot",
-        files={"bot_file": (filename, payload, "application/zip")},
-    )
+def build_upload_file(filename: str, payload: bytes) -> FakeUploadFile:
+    return FakeUploadFile(filename=filename, payload=payload)
 
 
 @pytest.fixture(autouse=True)
-def reset_match_state():
-    match_service.HAND_INTERVAL_SECONDS = 0.01
-    match_service.reset_match()
+def isolate_route_state(tmp_path, monkeypatch):
+    uploads_dir = tmp_path / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    service.HAND_INTERVAL_SECONDS = 0.01
+
+    monkeypatch.setattr(routes, "uploads_dir", uploads_dir)
+    monkeypatch.setattr(routes, "match_service", service)
     yield
-    match_service.reset_match()
+    service.reset_match()
 
 
-@pytest.fixture()
-def client():
-    return TestClient(create_app())
-
-
-def test_upload_rejects_invalid_seat(client: TestClient):
+@pytest.mark.anyio
+async def test_upload_rejects_invalid_seat():
     payload = build_zip({"bot.py": "class PokerBot: pass"})
-    response = upload_bot(client, "C", payload)
-    assert response.status_code == 400
-    assert response.json()["detail"] == "seat_id must be A or B"
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("C", build_upload_file("bot.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "seat_id must be A or B"
 
 
-def test_upload_rejects_non_zip(client: TestClient):
-    response = client.post(
-        "/api/v1/seats/A/bot",
-        files={"bot_file": ("bot.txt", b"not a zip", "text/plain")},
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Only .zip bot uploads are supported"
+@pytest.mark.anyio
+async def test_upload_rejects_non_zip():
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.txt", b"not a zip"))
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Only .zip bot uploads are supported"
 
 
-def test_upload_rejects_missing_bot_file(client: TestClient):
+@pytest.mark.anyio
+async def test_upload_rejects_payloads_over_size_limit():
+    oversized_payload = b"x" * ((10 * 1024 * 1024) + 1)
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.zip", oversized_payload))
+    assert exc_info.value.status_code == 413
+    assert exc_info.value.detail == "Upload exceeds 10MB limit"
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_missing_bot_file():
     payload = build_zip({"readme.txt": "no bot here"})
-    response = upload_bot(client, "A", payload)
-    assert response.status_code == 400
-    assert response.json()["detail"] == "bot.py must be at the root of the zip"
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "bot.py must be at the root of the zip"
 
 
-def test_upload_rejects_missing_pokerbot_class(client: TestClient):
+@pytest.mark.anyio
+async def test_upload_rejects_invalid_zip_archive():
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.zip", b"not-a-real-zip"))
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Upload is not a valid zip archive"
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_missing_pokerbot_class():
     payload = build_zip({"bot.py": "class NotBot: pass"})
-    response = upload_bot(client, "A", payload)
-    assert response.status_code == 400
-    assert response.json()["detail"] == "bot.py must define a PokerBot class"
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "bot.py must define a PokerBot class"
 
 
-def test_uploads_start_match_and_expose_hands(client: TestClient):
+@pytest.mark.anyio
+async def test_uploads_start_match_and_expose_hands():
     payload = build_zip(
         {
             "bot.py": """
 class PokerBot:
     def act(self, state):
-        return {\"action\": \"check\", \"amount\": 0}
+        return {"action": "check", "amount": 0}
 """
         }
     )
 
-    response_a = upload_bot(client, "A", payload)
-    assert response_a.status_code == 200
-    assert response_a.json()["seat"]["ready"] is True
-    assert response_a.json()["match"]["status"] == "waiting"
+    response_a = await routes.upload_bot("A", build_upload_file("alpha.zip", payload))
+    assert response_a["seat"]["ready"] is True
+    assert response_a["match"]["status"] == "waiting"
 
-    response_b = upload_bot(client, "B", payload)
-    assert response_b.status_code == 200
-    assert response_b.json()["match"]["status"] == "running"
+    response_b = await routes.upload_bot("B", build_upload_file("beta.zip", payload))
+    assert response_b["match"]["status"] == "running"
 
     deadline = time.monotonic() + 2.0
-    hands = []
+    hands: list[dict] = []
     while time.monotonic() < deadline:
-        hands_response = client.get("/api/v1/hands?limit=5")
-        assert hands_response.status_code == 200
-        hands = hands_response.json()["hands"]
+        hands = routes.list_hands(limit=5)["hands"]
         if hands:
             break
         time.sleep(0.05)
@@ -100,21 +126,18 @@ class PokerBot:
     assert hands, "Expected at least one hand to be generated"
 
     latest_hand_id = hands[-1]["hand_id"]
-    detail_response = client.get(f"/api/v1/hands/{latest_hand_id}")
-    assert detail_response.status_code == 200
-    detail = detail_response.json()
+    detail = routes.get_hand(latest_hand_id)
     assert detail["hand_id"] == latest_hand_id
     assert detail["history"]
 
-    reset_response = client.post("/api/v1/match/reset")
-    assert reset_response.status_code == 200
-    assert reset_response.json()["match"]["status"] == "waiting"
+    reset_response = routes.reset_match()
+    assert reset_response["match"]["status"] == "waiting"
+    assert all(not seat["ready"] for seat in routes.get_seats()["seats"])
+    assert routes.list_hands(limit=5)["hands"] == []
 
-    seats_response = client.get("/api/v1/seats")
-    assert seats_response.status_code == 200
-    for seat in seats_response.json()["seats"]:
-        assert seat["ready"] is False
 
-    hands_after_reset = client.get("/api/v1/hands?limit=5")
-    assert hands_after_reset.status_code == 200
-    assert hands_after_reset.json()["hands"] == []
+def test_get_hand_returns_404_for_unknown_hand():
+    with pytest.raises(HTTPException) as exc_info:
+        routes.get_hand("missing-hand")
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "Hand not found"

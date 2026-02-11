@@ -71,3 +71,14 @@ def test_bot_runner_timeout_and_error() -> None:
     result = error_runner.act({"legal_actions": ["check"]})
     assert result["action"] == "fold"
     assert result.get("error", "").startswith("error:")
+
+
+def test_bot_runner_invalid_response_falls_back() -> None:
+    class InvalidResponseBot:
+        def act(self, state):
+            return "check"
+
+    runner = BotRunner(bot=InvalidResponseBot(), seat_id="A", timeout_seconds=0.05)
+    result = runner.act({"legal_actions": ["check"]})
+    assert result["action"] == "fold"
+    assert result.get("error") == "invalid_response"

@@ -90,3 +90,6 @@ Goal: make MVP stable and deploy-ready.
 - [ ] `M3-T5` Perform release readiness review (owner: `release-agent`)
   - Acceptance: Known risks, test results, and deployment notes are documented.
   - Test Strategy: Release checklist review in PR.
+- [x] `M3-T6` Add sample aggressive and conservative upload-ready bots (owner: `feature-agent`)
+  - Acceptance: Repository includes two simple `PokerBot` examples and clear packaging/upload instructions.
+  - Test Strategy: Unit tests validate bot contract behavior and manual upload smoke check instructions are documented.

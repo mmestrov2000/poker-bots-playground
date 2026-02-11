@@ -60,6 +60,7 @@ Open `http://localhost:8000`.
 ## Bot Upload Contract
 Upload `.zip` with `bot.py` at root and class `PokerBot`.
 See `bot_template/README.md`.
+Ready-to-upload examples are in `bot_examples/README.md`.
 
 ## Current State
 This repo contains MVP bootstrap scaffolding. Core NLHE rules and robust bot sandboxing are tracked in `TASKS.md`.

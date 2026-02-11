@@ -6,6 +6,8 @@ from pathlib import Path
 from types import ModuleType
 from uuid import uuid4
 
+from app.bots.security import extract_archive_safely
+
 
 class BotLoadError(RuntimeError):
     pass
@@ -30,7 +32,10 @@ def load_bot_from_zip(zip_path: Path) -> object:
     extract_dir.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(zip_path, "r") as archive:
-        archive.extractall(extract_dir)
+        try:
+            extract_archive_safely(archive, extract_dir)
+        except ValueError as exc:
+            raise BotLoadError(str(exc)) from exc
 
     bot_file = extract_dir / "bot.py"
     if not bot_file.exists():

@@ -78,3 +78,36 @@ def test_reset_match_clears_state(tmp_path: Path) -> None:
     assert match["status"] == "waiting"
     assert match["hands_played"] == 0
     assert all(not seat["ready"] for seat in seats)
+
+
+def test_match_loop_runtime_error_stops_match_safely(tmp_path: Path) -> None:
+    class ExplodingEngine:
+        small_blind_cents = 50
+        big_blind_cents = 100
+
+        def play_hand(self, **kwargs):  # noqa: ANN003 - test double
+            raise RuntimeError("engine failure")
+
+    service = MatchService(
+        hand_store=HandStore(base_dir=tmp_path / "hands"),
+        engine=ExplodingEngine(),
+    )
+    service.HAND_INTERVAL_SECONDS = 0.01
+
+    bot_body = "\n".join(
+        [
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        return {'action': 'check'}",
+        ]
+    )
+    bot_a = _write_bot_zip(tmp_path, "alpha.zip", bot_body)
+    bot_b = _write_bot_zip(tmp_path, "beta.zip", bot_body)
+
+    service.register_bot("A", "alpha.zip", bot_path=bot_a)
+    service.register_bot("B", "beta.zip", bot_path=bot_b)
+
+    sleep(0.05)
+    match = service.get_match()
+    assert match["status"] == "waiting"
+    assert match["hands_played"] == 0

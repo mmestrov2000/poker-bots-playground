@@ -10,9 +10,15 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 COPY backend /app/backend
 COPY frontend /app/frontend
-RUN mkdir -p /app/runtime/uploads /app/runtime/hands
+RUN adduser --disabled-password --gecos "" appuser \
+    && mkdir -p /app/runtime/uploads /app/runtime/hands \
+    && chown -R appuser:appuser /app
 
 ENV PYTHONPATH=/app/backend
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3).getcode() == 200 else 1)"
+
+USER appuser
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

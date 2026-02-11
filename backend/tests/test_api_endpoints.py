@@ -88,6 +88,36 @@ async def test_upload_rejects_invalid_zip_archive():
 
 
 @pytest.mark.anyio
+async def test_upload_rejects_unsafe_archive_paths():
+    payload = build_zip({"../bot.py": "class PokerBot: pass"})
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Archive contains unsafe paths"
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_archives_with_too_many_files():
+    files = {f"file_{i}.txt": "x" for i in range(130)}
+    files["bot.py"] = "class PokerBot:\n    def act(self, state):\n        return {'action': 'check'}"
+    payload = build_zip(files)
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert "Archive contains too many files" in exc_info.value.detail
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_large_bot_source_file():
+    big_source = "class PokerBot:\n    pass\n" + ("#" * (256 * 1024))
+    payload = build_zip({"bot.py": big_source})
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert "bot.py exceeds" in exc_info.value.detail
+
+
+@pytest.mark.anyio
 async def test_upload_rejects_missing_pokerbot_class():
     payload = build_zip({"bot.py": "class NotBot: pass"})
     with pytest.raises(HTTPException) as exc_info:

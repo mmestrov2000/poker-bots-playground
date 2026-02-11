@@ -12,6 +12,7 @@ from app.storage.hand_store import HandStore
 
 
 SeatId = Literal["A", "B"]
+MatchStatus = Literal["waiting", "running", "paused", "stopped"]
 
 
 @dataclass
@@ -58,7 +59,7 @@ class MatchService:
         self._lock = Lock()
         self._stop_event = Event()
         self._loop_thread: Thread | None = None
-        self._status: Literal["waiting", "running"] = "waiting"
+        self._status: MatchStatus = "waiting"
         self._started_at: datetime | None = None
         self._hands: list[HandRecord] = []
         self._hand_counter = 0
@@ -132,13 +133,57 @@ class MatchService:
             seat.bot_name = bot_name
             seat.uploaded_at = now
 
-            if self._seats["A"].ready and self._seats["B"].ready:
-                if self._status != "running":
-                    self._status = "running"
-                    self._started_at = now
-                    self._ensure_loop_running_locked()
-
             return seat.to_dict()
+
+    def start_match(self) -> None:
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            if self._status == "running":
+                raise RuntimeError("Match already running")
+            if self._status == "paused":
+                raise RuntimeError("Match is paused; use resume")
+            if not (self._seats["A"].ready and self._seats["B"].ready):
+                raise RuntimeError("Both seats must be ready to start")
+            previous_status = self._status
+            self._status = "running"
+            if previous_status in {"waiting", "stopped"} or self._started_at is None:
+                self._started_at = now
+            self._ensure_loop_running_locked()
+
+    def pause_match(self) -> None:
+        thread: Thread | None
+        with self._lock:
+            if self._status != "running":
+                raise RuntimeError("Match is not running")
+            self._status = "paused"
+            self._stop_event.set()
+            thread = self._loop_thread
+            self._loop_thread = None
+        if thread and thread.is_alive() and thread is not current_thread():
+            thread.join(timeout=2)
+
+    def resume_match(self) -> None:
+        with self._lock:
+            if self._status != "paused":
+                raise RuntimeError("Match is not paused")
+            if not (self._seats["A"].ready and self._seats["B"].ready):
+                raise RuntimeError("Both seats must be ready to resume")
+            self._status = "running"
+            if self._started_at is None:
+                self._started_at = datetime.now(timezone.utc)
+            self._ensure_loop_running_locked()
+
+    def end_match(self) -> None:
+        thread: Thread | None
+        with self._lock:
+            if self._status not in {"running", "paused"}:
+                raise RuntimeError("Match is not running")
+            self._status = "stopped"
+            self._stop_event.set()
+            thread = self._loop_thread
+            self._loop_thread = None
+        if thread and thread.is_alive() and thread is not current_thread():
+            thread.join(timeout=2)
 
     def reset_match(self) -> None:
         thread: Thread | None

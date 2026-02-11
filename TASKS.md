@@ -101,6 +101,17 @@ Goal: keep Hand Detail stable until a user selects a different hand.
   - Acceptance: Reset/re-upload returns Hand Detail to the empty prompt and clears selection.
   - Test Strategy: Manual UI check after reset and re-upload.
 
+## Feature: Modern Table UI + Match Controls
+Goal: add a poker table layout with seat taking and match control buttons.
+
+- [x] `F4-T1` Create a new branch from main for feature work (owner: `feature-agent`)
+- [x] `F4-T2` Extend match service state to support start/pause/resume/end without auto-start on upload (owner: `feature-agent`)
+- [x] `F4-T3` Add match control API endpoints for start/pause/resume/end (owner: `feature-agent`)
+- [x] `F4-T4` Redesign frontend layout with a modern table and seat controls (owner: `feature-agent`)
+- [x] `F4-T5` Wire frontend seat uploads and match control buttons to new endpoints (owner: `feature-agent`)
+- [x] `F4-T6` Add/update backend tests for match control flows (owner: `test-agent`)
+- [ ] `F4-T7` Run manual UI smoke test for seating and match controls (owner: `feature-agent`)
+
 ## Feature: Hand History On-Demand Pagination
 Goal: gate hand history behind a button with snapshot-based pagination and page-size controls.
 

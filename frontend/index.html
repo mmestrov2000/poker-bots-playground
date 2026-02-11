@@ -13,24 +13,36 @@
         <p>Heads-up No-Limit Texas Hold'em bot battle.</p>
       </header>
 
-      <section class="seats">
-        <article class="seat-card">
-          <h2>Seat A</h2>
-          <p id="seat-a-status">Status: empty</p>
-          <input id="seat-a-file" type="file" accept=".zip" />
-          <button id="seat-a-upload">Upload Bot</button>
-        </article>
+      <section class="table-area">
+        <div class="poker-table">
+          <div class="table-center">
+            <span>Heads-Up Arena</span>
+          </div>
 
-        <article class="seat-card">
-          <h2>Seat B</h2>
-          <p id="seat-b-status">Status: empty</p>
-          <input id="seat-b-file" type="file" accept=".zip" />
-          <button id="seat-b-upload">Upload Bot</button>
-        </article>
+          <article class="seat seat-a">
+            <h2>Seat A</h2>
+            <p id="seat-a-status" class="seat-status">Seat A empty</p>
+            <input id="seat-a-file" class="seat-input" type="file" accept=".zip" />
+            <button id="seat-a-take" class="seat-button">Take a seat</button>
+          </article>
+
+          <article class="seat seat-b">
+            <h2>Seat B</h2>
+            <p id="seat-b-status" class="seat-status">Seat B empty</p>
+            <input id="seat-b-file" class="seat-input" type="file" accept=".zip" />
+            <button id="seat-b-take" class="seat-button">Take a seat</button>
+          </article>
+        </div>
       </section>
 
       <section class="match-controls">
-        <button id="reset-match">Reset Match</button>
+        <div class="match-buttons">
+          <button id="start-match">Start</button>
+          <button id="pause-match" class="button-secondary">Pause</button>
+          <button id="resume-match" class="button-secondary">Resume</button>
+          <button id="end-match" class="button-danger">End</button>
+          <button id="reset-match" class="button-ghost">Reset</button>
+        </div>
         <p id="match-status">Match: waiting</p>
       </section>
 

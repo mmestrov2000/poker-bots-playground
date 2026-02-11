@@ -8,6 +8,30 @@ let handsPageSize = 100;
 let handsTotalHands = 0;
 let handsTotalPages = 0;
 let latestMatch = null;
+let handDetailMode = "logs";
+let handDetailText = handDetailPlaceholder;
+let pnlLastHandId = null;
+let pnlPointsA = [];
+let pnlPointsB = [];
+let pnlRefreshing = false;
+let seatNames = { A: null, B: null };
+
+const handDetailTabs = {
+  logs: document.getElementById("hand-detail-logs"),
+  replay: document.getElementById("hand-detail-replay"),
+};
+
+const pnlElements = {
+  chart: document.getElementById("pnl-chart"),
+  lineA: document.getElementById("pnl-line-a"),
+  lineB: document.getElementById("pnl-line-b"),
+  zeroLine: document.getElementById("pnl-zero-line"),
+  empty: document.getElementById("pnl-empty"),
+  labelA: document.getElementById("pnl-label-a"),
+  labelB: document.getElementById("pnl-label-b"),
+  valueA: document.getElementById("pnl-value-a"),
+  valueB: document.getElementById("pnl-value-b"),
+};
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, options);
@@ -26,6 +50,11 @@ function updateSeatStatus(seats) {
   const seatReadyA = Boolean(seatA?.ready);
   const seatReadyB = Boolean(seatB?.ready);
 
+  seatNames = {
+    A: seatA?.bot_name || null,
+    B: seatB?.bot_name || null,
+  };
+
   document.getElementById("seat-a-status").textContent = seatReadyA ? "Seat A taken" : "Seat A empty";
   document.getElementById("seat-b-status").textContent = seatReadyB ? "Seat B taken" : "Seat B empty";
 
@@ -40,6 +69,169 @@ function updateSeatStatus(seats) {
   seatBInput.disabled = seatReadyB;
 
   return seatReadyA && seatReadyB;
+}
+
+function formatCurrency(value) {
+  const absolute = Math.abs(value);
+  return `${value < 0 ? "-" : ""}$${absolute.toFixed(2)}`;
+}
+
+function updatePnlValueClass(element, value) {
+  element.classList.remove("pnl-positive", "pnl-negative");
+  if (value > 0) {
+    element.classList.add("pnl-positive");
+  } else if (value < 0) {
+    element.classList.add("pnl-negative");
+  }
+}
+
+function updatePnlLegend() {
+  const labelA = seatNames.A ? `Seat A (${seatNames.A})` : "Seat A";
+  const labelB = seatNames.B ? `Seat B (${seatNames.B})` : "Seat B";
+  const valueA = pnlPointsA.length ? pnlPointsA[pnlPointsA.length - 1].value : 0;
+  const valueB = pnlPointsB.length ? pnlPointsB[pnlPointsB.length - 1].value : 0;
+
+  pnlElements.labelA.textContent = labelA;
+  pnlElements.labelB.textContent = labelB;
+  pnlElements.valueA.textContent = formatCurrency(valueA);
+  pnlElements.valueB.textContent = formatCurrency(valueB);
+
+  updatePnlValueClass(pnlElements.valueA, valueA);
+  updatePnlValueClass(pnlElements.valueB, valueB);
+}
+
+function renderHandDetail() {
+  const detail = document.getElementById("hand-detail");
+  detail.textContent = handDetailMode === "logs" ? handDetailText : "";
+}
+
+function setHandDetailMode(mode) {
+  handDetailMode = mode;
+  if (handDetailTabs.logs) {
+    handDetailTabs.logs.classList.toggle("active", mode === "logs");
+  }
+  if (handDetailTabs.replay) {
+    handDetailTabs.replay.classList.toggle("active", mode === "replay");
+  }
+  renderHandDetail();
+}
+
+function renderPnlChart() {
+  if (!pnlElements.chart) {
+    return;
+  }
+
+  const width = 640;
+  const height = 280;
+  if (!pnlPointsA.length) {
+    pnlElements.lineA.setAttribute("d", "");
+    pnlElements.lineB.setAttribute("d", "");
+    pnlElements.zeroLine.setAttribute("x1", "0");
+    pnlElements.zeroLine.setAttribute("x2", width.toString());
+    const mid = height / 2;
+    pnlElements.zeroLine.setAttribute("y1", mid.toString());
+    pnlElements.zeroLine.setAttribute("y2", mid.toString());
+    pnlElements.empty.classList.remove("hidden");
+    return;
+  }
+
+  pnlElements.empty.classList.add("hidden");
+
+  const values = [
+    ...pnlPointsA.map((point) => point.value),
+    ...pnlPointsB.map((point) => point.value),
+  ];
+  let minValue = Math.min(...values);
+  let maxValue = Math.max(...values);
+  if (minValue === maxValue) {
+    minValue -= 1;
+    maxValue += 1;
+  } else {
+    const padding = (maxValue - minValue) * 0.1;
+    minValue -= padding;
+    maxValue += padding;
+  }
+
+  const minHand = pnlPointsA[0].handId;
+  const maxHand = pnlPointsA[pnlPointsA.length - 1].handId;
+  const xFor = (handId) => {
+    if (maxHand === minHand) {
+      return width / 2;
+    }
+    return ((handId - minHand) / (maxHand - minHand)) * width;
+  };
+  const yFor = (value) => height - ((value - minValue) / (maxValue - minValue)) * height;
+  const buildPath = (points) =>
+    points
+      .map((point, index) => {
+        const x = xFor(point.handId).toFixed(2);
+        const y = yFor(point.value).toFixed(2);
+        return `${index === 0 ? "M" : "L"}${x},${y}`;
+      })
+      .join(" ");
+
+  pnlElements.lineA.setAttribute("d", buildPath(pnlPointsA));
+  pnlElements.lineB.setAttribute("d", buildPath(pnlPointsB));
+
+  const zeroY = yFor(0);
+  pnlElements.zeroLine.setAttribute("x1", "0");
+  pnlElements.zeroLine.setAttribute("x2", width.toString());
+  pnlElements.zeroLine.setAttribute("y1", zeroY.toFixed(2));
+  pnlElements.zeroLine.setAttribute("y2", zeroY.toFixed(2));
+}
+
+function resetPnlState() {
+  pnlLastHandId = null;
+  pnlPointsA = [];
+  pnlPointsB = [];
+  renderPnlChart();
+  updatePnlLegend();
+}
+
+function applyPnlEntries(entries) {
+  entries.forEach((entry) => {
+    const handId = Number(entry.hand_id);
+    if (!Number.isFinite(handId)) {
+      return;
+    }
+    const lastHandId = pnlPointsA.length ? pnlPointsA[pnlPointsA.length - 1].handId : 0;
+    if (handId <= lastHandId) {
+      return;
+    }
+    const deltaA = Number(entry.delta_a) || 0;
+    const deltaB = Number(entry.delta_b) || 0;
+    const lastValueA = pnlPointsA.length ? pnlPointsA[pnlPointsA.length - 1].value : 0;
+    const lastValueB = pnlPointsB.length ? pnlPointsB[pnlPointsB.length - 1].value : 0;
+
+    pnlPointsA.push({ handId, value: lastValueA + deltaA });
+    pnlPointsB.push({ handId, value: lastValueB + deltaB });
+  });
+}
+
+async function refreshPnl() {
+  if (pnlRefreshing) {
+    return;
+  }
+  pnlRefreshing = true;
+  try {
+    const params = new URLSearchParams();
+    if (pnlLastHandId !== null) {
+      params.set("since_hand_id", pnlLastHandId.toString());
+    }
+    const query = params.toString();
+    const response = await request(`/pnl${query ? `?${query}` : ""}`);
+    const entries = response.entries ?? [];
+    applyPnlEntries(entries);
+    if (response.last_hand_id !== null && response.last_hand_id !== undefined) {
+      pnlLastHandId = response.last_hand_id;
+    }
+    renderPnlChart();
+    updatePnlLegend();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    pnlRefreshing = false;
+  }
 }
 
 function updateMatchStatus(match) {
@@ -104,8 +296,10 @@ function renderHands(hands) {
 }
 
 function setHandHistoryVisibility(isVisible) {
+  const body = document.getElementById("hands-body");
   const list = document.getElementById("hands-list");
   const controls = document.getElementById("hands-controls");
+  body.classList.toggle("hidden", !isVisible);
   list.classList.toggle("hidden", !isVisible);
   controls.classList.toggle("hidden", !isVisible);
 }
@@ -162,12 +356,14 @@ async function showHandHistory() {
 async function openHand(handId) {
   const hand = await request(`/hands/${handId}`);
   selectedHandId = handId;
-  document.getElementById("hand-detail").textContent = hand.history || "No hand history available.";
+  handDetailText = hand.history || "No hand history available.";
+  renderHandDetail();
 }
 
 function clearHandDetail() {
   selectedHandId = null;
-  document.getElementById("hand-detail").textContent = handDetailPlaceholder;
+  handDetailText = handDetailPlaceholder;
+  renderHandDetail();
 }
 
 function clearHandHistory() {
@@ -189,6 +385,11 @@ async function refreshState() {
     const seatsReady = updateSeatStatus(seats.seats);
     updateMatchStatus(match.match);
     updateMatchControls(match.match, seatsReady);
+    if (match.match.hands_played === 0 && (pnlPointsA.length || pnlPointsB.length)) {
+      resetPnlState();
+    }
+    updatePnlLegend();
+    await refreshPnl();
   } catch (error) {
     console.error(error);
   }
@@ -218,12 +419,15 @@ async function resetMatch() {
   await request("/match/reset", { method: "POST" });
   clearHandDetail();
   clearHandHistory();
+  resetPnlState();
   await refreshState();
 }
 
 function wireEvents() {
   const seatAInput = document.getElementById("seat-a-file");
   const seatBInput = document.getElementById("seat-b-file");
+  const logsTab = document.getElementById("hand-detail-logs");
+  const replayTab = document.getElementById("hand-detail-replay");
 
   document.getElementById("seat-a-take").addEventListener("click", () => seatAInput.click());
   document.getElementById("seat-b-take").addEventListener("click", () => seatBInput.click());
@@ -257,10 +461,18 @@ function wireEvents() {
       loadHandHistoryPage().catch((error) => alert(error.message));
     }
   });
+  if (logsTab) {
+    logsTab.addEventListener("click", () => setHandDetailMode("logs"));
+  }
+  if (replayTab) {
+    replayTab.addEventListener("click", () => setHandDetailMode("replay"));
+  }
   handsPageSize = Number(document.getElementById("hands-page-size").value);
   updateHandsPagination();
 }
 
 wireEvents();
+setHandDetailMode("logs");
+resetPnlState();
 refreshState();
 setInterval(refreshState, 2000);

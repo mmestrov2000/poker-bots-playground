@@ -132,6 +132,14 @@ def list_hands(
     }
 
 
+@router.get("/pnl")
+def get_pnl(
+    since_hand_id: Annotated[int | None, Query(ge=0)] = None,
+) -> dict:
+    entries, last_hand_id = match_service.list_pnl(since_hand_id=since_hand_id)
+    return {"entries": entries, "last_hand_id": last_hand_id}
+
+
 @router.get("/hands/{hand_id}")
 def get_hand(hand_id: str) -> dict:
     hand = match_service.get_hand(hand_id)

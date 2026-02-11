@@ -127,3 +127,16 @@ Goal: gate hand history behind a button with snapshot-based pagination and page-
 - [~] `FHH-T4` Validate and open PR after tests pass (owner: `release-agent`)
   - Acceptance: `scripts/run_backend_pytest.sh` passes and PR is opened after local validation.
   - Test Strategy: Attach test output or CI status to PR.
+
+## Feature: P&L Graph + Arena Layout
+Goal: add a real-time P&L chart alongside the poker table.
+
+- [x] `FPNL-T1` Add P&L API endpoint and match service helper (owner: `feature-agent`)
+  - Acceptance: `/api/v1/pnl` returns per-hand P&L deltas and last hand id.
+  - Test Strategy: Unit/API tests for P&L responses and snapshot behavior.
+- [x] `FPNL-T2` Update frontend layout with right-side P&L chart (owner: `feature-agent`)
+  - Acceptance: Table shifts left, graph shows two curves, legend updates with color-coded net P&L.
+  - Test Strategy: Manual UI smoke test with running match.
+- [x] `FPNL-T3` Update documentation and validations (owner: `feature-agent`)
+  - Acceptance: PROJECT_SPEC API surface lists /pnl endpoint.
+  - Test Strategy: Doc review.

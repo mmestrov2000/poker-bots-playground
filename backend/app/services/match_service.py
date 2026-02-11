@@ -104,6 +104,30 @@ class MatchService:
             page_records = self._hands[start:end]
             return [record.to_summary_dict() for record in reversed(page_records)]
 
+    def list_pnl(self, since_hand_id: int | None = None) -> tuple[list[dict], int | None]:
+        with self._lock:
+            if not self._hands:
+                return [], None
+            entries: list[dict] = []
+            last_hand_id: int | None = None
+            for record in self._hands:
+                try:
+                    hand_number = int(record.hand_id)
+                except ValueError:
+                    continue
+                last_hand_id = hand_number
+                if since_hand_id is not None and hand_number <= since_hand_id:
+                    continue
+                delta_a = record.pot if record.winner == "A" else -record.pot
+                entries.append(
+                    {
+                        "hand_id": hand_number,
+                        "delta_a": delta_a,
+                        "delta_b": -delta_a,
+                    }
+                )
+            return entries, last_hand_id
+
     def get_hand(self, hand_id: str) -> dict | None:
         with self._lock:
             record = next((h for h in self._hands if h.hand_id == hand_id), None)

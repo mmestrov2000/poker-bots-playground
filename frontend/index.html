@@ -13,65 +13,108 @@
         <p>Heads-up No-Limit Texas Hold'em bot battle.</p>
       </header>
 
-      <section class="table-area">
-        <div class="poker-table">
-          <div class="table-center">
-            <span>Heads-Up Arena</span>
+      <section class="arena">
+        <div class="arena-left">
+          <section class="table-area">
+            <div class="poker-table">
+              <div class="table-center">
+                <span>Heads-Up Arena</span>
+              </div>
+
+              <article class="seat seat-a">
+                <h2>Seat A</h2>
+                <p id="seat-a-status" class="seat-status">Seat A empty</p>
+                <input id="seat-a-file" class="seat-input" type="file" accept=".zip" />
+                <button id="seat-a-take" class="seat-button">Take a seat</button>
+              </article>
+
+              <article class="seat seat-b">
+                <h2>Seat B</h2>
+                <p id="seat-b-status" class="seat-status">Seat B empty</p>
+                <input id="seat-b-file" class="seat-input" type="file" accept=".zip" />
+                <button id="seat-b-take" class="seat-button">Take a seat</button>
+              </article>
+            </div>
+          </section>
+
+          <section class="match-controls">
+            <div class="match-buttons">
+              <button id="start-match">Start</button>
+              <button id="pause-match" class="button-secondary">Pause</button>
+              <button id="resume-match" class="button-secondary">Resume</button>
+              <button id="end-match" class="button-danger">End</button>
+              <button id="reset-match" class="button-ghost">Reset</button>
+            </div>
+            <p id="match-status">Match: waiting</p>
+          </section>
+        </div>
+
+        <aside class="pnl-panel">
+          <div class="pnl-header">
+            <h2>P&L</h2>
+            <p class="pnl-subtitle">Net by hand</p>
           </div>
-
-          <article class="seat seat-a">
-            <h2>Seat A</h2>
-            <p id="seat-a-status" class="seat-status">Seat A empty</p>
-            <input id="seat-a-file" class="seat-input" type="file" accept=".zip" />
-            <button id="seat-a-take" class="seat-button">Take a seat</button>
-          </article>
-
-          <article class="seat seat-b">
-            <h2>Seat B</h2>
-            <p id="seat-b-status" class="seat-status">Seat B empty</p>
-            <input id="seat-b-file" class="seat-input" type="file" accept=".zip" />
-            <button id="seat-b-take" class="seat-button">Take a seat</button>
-          </article>
-        </div>
-      </section>
-
-      <section class="match-controls">
-        <div class="match-buttons">
-          <button id="start-match">Start</button>
-          <button id="pause-match" class="button-secondary">Pause</button>
-          <button id="resume-match" class="button-secondary">Resume</button>
-          <button id="end-match" class="button-danger">End</button>
-          <button id="reset-match" class="button-ghost">Reset</button>
-        </div>
-        <p id="match-status">Match: waiting</p>
-      </section>
-
-      <section>
-        <div class="hands-header">
-          <h2>Hands Played</h2>
-          <button id="hand-history-button" type="button">Hand History</button>
-        </div>
-        <div id="hands-controls" class="hands-controls hidden">
-          <label class="hands-page-size">
-            Hands per page
-            <select id="hands-page-size">
-              <option value="100" selected>100</option>
-              <option value="250">250</option>
-              <option value="1000">1000</option>
-            </select>
-          </label>
-          <div class="hands-pagination">
-            <button id="hands-prev" type="button" disabled>Prev</button>
-            <span id="hands-page-info">Page 1 of 1</span>
-            <button id="hands-next" type="button" disabled>Next</button>
+          <div class="pnl-legend">
+            <div class="pnl-legend-item">
+              <span class="pnl-dot pnl-dot-a"></span>
+              <span id="pnl-label-a" class="pnl-label">Seat A</span>
+              <span id="pnl-value-a" class="pnl-value">$0.00</span>
+            </div>
+            <div class="pnl-legend-item">
+              <span class="pnl-dot pnl-dot-b"></span>
+              <span id="pnl-label-b" class="pnl-label">Seat B</span>
+              <span id="pnl-value-b" class="pnl-value">$0.00</span>
+            </div>
           </div>
-        </div>
-        <ul id="hands-list" class="hands-list hidden"></ul>
+          <div class="pnl-chart">
+            <svg id="pnl-chart" viewBox="0 0 640 280" preserveAspectRatio="none" aria-label="P&L graph">
+              <line id="pnl-zero-line" x1="0" y1="140" x2="640" y2="140" />
+              <path id="pnl-line-a" />
+              <path id="pnl-line-b" />
+            </svg>
+            <div id="pnl-empty" class="pnl-empty">No hands yet.</div>
+          </div>
+        </aside>
       </section>
 
-      <section>
-        <h2>Hand Detail</h2>
-        <pre id="hand-detail" class="hand-detail">Select a hand to view full history.</pre>
+      <section class="history-grid">
+        <section class="history-panel">
+          <div class="panel-header">
+            <h2>Hands Played</h2>
+            <button id="hand-history-button" type="button">Hand History</button>
+          </div>
+          <div id="hands-body" class="panel-body hands-body hidden">
+            <div id="hands-controls" class="hands-controls hidden">
+              <label class="hands-page-size">
+                Hands per page
+                <select id="hands-page-size">
+                  <option value="100" selected>100</option>
+                  <option value="250">250</option>
+                  <option value="1000">1000</option>
+                </select>
+              </label>
+              <div class="hands-pagination">
+                <button id="hands-prev" type="button" disabled>Prev</button>
+                <span id="hands-page-info">Page 1 of 1</span>
+                <button id="hands-next" type="button" disabled>Next</button>
+              </div>
+            </div>
+            <ul id="hands-list" class="hands-list hidden"></ul>
+          </div>
+        </section>
+
+        <section class="history-panel">
+          <div class="panel-header">
+            <h2>Hand Detail</h2>
+          </div>
+          <div class="panel-body detail-body">
+            <div class="detail-tabs">
+              <button id="hand-detail-logs" type="button" class="button-ghost detail-tab active">Logs</button>
+              <button id="hand-detail-replay" type="button" class="button-ghost detail-tab">Replay</button>
+            </div>
+            <pre id="hand-detail" class="hand-detail">Select a hand to view full history.</pre>
+          </div>
+        </section>
       </section>
     </main>
 

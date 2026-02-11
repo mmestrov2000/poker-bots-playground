@@ -123,6 +123,53 @@ def test_list_hands_paginates_with_snapshot(tmp_path: Path) -> None:
     assert [hand["hand_id"] for hand in snapshot_page] == ["3", "2"]
 
 
+def test_list_pnl_returns_deltas_and_last_hand_id(tmp_path: Path) -> None:
+    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    now = datetime.now(timezone.utc)
+    with service._lock:
+        service._hands = [
+            HandRecord(
+                hand_id="1",
+                completed_at=now,
+                summary="Hand #1",
+                winner="A",
+                pot=1.0,
+                history_path="1.txt",
+            ),
+            HandRecord(
+                hand_id="2",
+                completed_at=now,
+                summary="Hand #2",
+                winner="B",
+                pot=2.0,
+                history_path="2.txt",
+            ),
+            HandRecord(
+                hand_id="3",
+                completed_at=now,
+                summary="Hand #3",
+                winner="A",
+                pot=1.5,
+                history_path="3.txt",
+            ),
+        ]
+
+    entries, last_hand_id = service.list_pnl()
+    assert last_hand_id == 3
+    assert entries == [
+        {"hand_id": 1, "delta_a": 1.0, "delta_b": -1.0},
+        {"hand_id": 2, "delta_a": -2.0, "delta_b": 2.0},
+        {"hand_id": 3, "delta_a": 1.5, "delta_b": -1.5},
+    ]
+
+    entries, last_hand_id = service.list_pnl(since_hand_id=1)
+    assert last_hand_id == 3
+    assert entries == [
+        {"hand_id": 2, "delta_a": -2.0, "delta_b": 2.0},
+        {"hand_id": 3, "delta_a": 1.5, "delta_b": -1.5},
+    ]
+
+
 def test_match_loop_runtime_error_stops_match_safely(tmp_path: Path) -> None:
     class ExplodingEngine:
         small_blind_cents = 50

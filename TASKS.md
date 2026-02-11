@@ -75,7 +75,7 @@ Goal: provide end-user upload and hand browsing experience.
 ## Milestone 3: Quality, Hardening, and Release
 Goal: make MVP stable and deploy-ready.
 
-- [ ] `M3-T1` Add comprehensive backend test suite for engine and API (owner: `test-agent`)
+- [x] `M3-T1` Add comprehensive backend test suite for engine and API (owner: `test-agent`)
   - Acceptance: Critical flows and failure paths are covered.
   - Test Strategy: `pytest` suite green locally and in CI.
 - [ ] `M3-T2` Add bot upload constraints and runtime safeguards (owner: `feature-agent`)

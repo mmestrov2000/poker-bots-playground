@@ -20,6 +20,11 @@ class CheckCallBot:
         return {"action": "fold"}
 
 
+class ExplodingBot:
+    def act(self, state: dict) -> dict:
+        raise RuntimeError("boom")
+
+
 def test_engine_play_hand_reaches_showdown() -> None:
     engine = PokerEngine(rng=Random(7))
     bot_a = BotRunner(bot=CheckCallBot(), seat_id="A", timeout_seconds=0.5)
@@ -80,3 +85,28 @@ def test_normalize_action_raise_bounds() -> None:
     )
     assert action == "raise"
     assert amount == 300
+
+
+def test_engine_ends_hand_when_bot_runtime_fails_preflop() -> None:
+    engine = PokerEngine(rng=Random(11))
+    bot_a = BotRunner(bot=ExplodingBot(), seat_id="A", timeout_seconds=0.5)
+    bot_b = BotRunner(bot=CheckCallBot(), seat_id="B", timeout_seconds=0.5)
+
+    result = engine.play_hand(
+        hand_id="1",
+        bot_a=bot_a,
+        bot_b=bot_b,
+        seat_a_name="alpha",
+        seat_b_name="beta",
+    )
+
+    assert result.winner == "B"
+    assert result.board == []
+    assert any(action.action == "fold" and action.street == "preflop" for action in result.actions)
+
+
+def test_button_for_hand_alternates_by_hand_id() -> None:
+    engine = PokerEngine(rng=Random(3))
+    assert engine.button_for_hand("1") == "A"
+    assert engine.button_for_hand("2") == "B"
+    assert engine.button_for_hand("not-a-number") == "A"

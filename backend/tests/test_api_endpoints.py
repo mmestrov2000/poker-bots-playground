@@ -62,6 +62,14 @@ async def test_upload_rejects_non_zip():
 
 
 @pytest.mark.anyio
+async def test_upload_rejects_empty_payload():
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.zip", b""))
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Upload payload is empty"
+
+
+@pytest.mark.anyio
 async def test_upload_rejects_payloads_over_size_limit():
     oversized_payload = b"x" * ((10 * 1024 * 1024) + 1)
     with pytest.raises(HTTPException) as exc_info:
@@ -111,6 +119,20 @@ async def test_upload_rejects_unsafe_archive_paths():
         await routes.upload_bot("A", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Archive contains unsafe paths"
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_archives_with_multiple_bot_candidates():
+    payload = build_zip(
+        {
+            "bot_a/bot.py": "class PokerBot: pass",
+            "bot_b/bot.py": "class PokerBot: pass",
+        }
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Archive contains multiple bot.py candidates"
 
 
 @pytest.mark.anyio

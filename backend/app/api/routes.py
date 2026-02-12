@@ -1,12 +1,18 @@
 import math
+import logging
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from app.bots.loader import BotLoadError, save_upload
+from app.bots.registry import BotRegistry, derive_bot_id
 from app.bots.security import MAX_UPLOAD_BYTES
 from app.bots.validator import validate_bot_archive
+from app.db.config import get_db_config
 from app.engine.game import SEAT_ORDER
 from app.services.match_service import MatchService
 from app.storage.hand_store import HandStore
@@ -16,6 +22,9 @@ router = APIRouter()
 repo_root = Path(__file__).resolve().parents[3]
 uploads_dir = repo_root / "runtime" / "uploads"
 uploads_dir.mkdir(parents=True, exist_ok=True)
+bot_registry = BotRegistry()
+logger = logging.getLogger(__name__)
+_shared_bootstrapped = False
 
 match_service = MatchService(hand_store=HandStore())
 
@@ -48,17 +57,32 @@ async def upload_bot(seat_id: str, bot_file: UploadFile = File(...)) -> dict:
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_message or "Invalid bot archive")
 
+    bot_id = derive_bot_id(filename, payload)
     bot_path = save_upload(
         seat_id=normalized_seat,
         filename=filename,
         payload=payload,
         uploads_dir=uploads_dir,
     )
-
     try:
-        seat = match_service.register_bot(normalized_seat, filename, bot_path=bot_path)
+        seat = match_service.register_bot(
+            normalized_seat,
+            filename,
+            bot_path=bot_path,
+            bot_id=bot_id,
+        )
     except BotLoadError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    db_config = get_db_config()
+    bot_schema = f"{db_config.private_schema_prefix}{bot_id}"
+    db_user = f"{bot_schema}_rw"
+    registry_entry = bot_registry.ensure_entry(
+        bot_id=bot_id,
+        bot_name=filename,
+        schema=bot_schema,
+        db_user=db_user,
+    )
+    _maybe_bootstrap_db(db_config, registry_entry)
     return {"seat": seat, "match": match_service.get_match()}
 
 
@@ -152,3 +176,62 @@ def get_hand(hand_id: str) -> dict:
     if hand is None:
         raise HTTPException(status_code=404, detail="Hand not found")
     return hand
+
+
+@router.get("/bots/{bot_id}/db-info")
+def get_db_info(bot_id: str) -> dict:
+    entry = bot_registry.get(bot_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Bot not found")
+    db_config = get_db_config()
+    return {
+        "enabled": db_config.enabled,
+        "host": db_config.host,
+        "port": db_config.port,
+        "name": db_config.name,
+        "schema": entry["schema"],
+        "shared_schema": db_config.shared_schema,
+        "user": entry["db_user"],
+        "password": entry["db_password"],
+        "sslmode": db_config.sslmode,
+    }
+
+
+def _maybe_bootstrap_db(db_config, entry: dict) -> None:
+    global _shared_bootstrapped
+    if not db_config.enabled:
+        return
+    script_path = repo_root / "backend" / "scripts" / "db_bootstrap.py"
+    if not script_path.exists():
+        logger.warning("db_bootstrap.py not found; skipping bootstrap")
+        return
+    env = os.environ.copy()
+    if db_config.shared_aggregator_user:
+        env["DB_SHARED_AGGREGATOR_USER"] = db_config.shared_aggregator_user
+    if db_config.shared_aggregator_password:
+        env["DB_SHARED_AGGREGATOR_PASSWORD"] = db_config.shared_aggregator_password
+    try:
+        if not _shared_bootstrapped:
+            shared_cmd = [sys.executable, str(script_path), "--shared"]
+            if db_config.shared_aggregator_password:
+                shared_cmd += [
+                    "--shared-aggregator-password",
+                    db_config.shared_aggregator_password,
+                ]
+            subprocess.run(shared_cmd, check=True, cwd=str(repo_root), env=env)
+            _shared_bootstrapped = True
+        subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "--bot-id",
+                entry["bot_id"],
+                "--bot-password",
+                entry["db_password"],
+            ],
+            check=True,
+            cwd=str(repo_root),
+            env=env,
+        )
+    except Exception:
+        logger.warning("DB bootstrap failed", exc_info=True)

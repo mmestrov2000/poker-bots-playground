@@ -1,6 +1,7 @@
 from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
 from threading import Event, Lock, Thread, current_thread
 from typing import Literal
 
@@ -8,10 +9,14 @@ from app.bots.loader import load_bot_from_zip
 from app.bots.runtime import BotRunner
 from app.engine.game import PokerEngine, SeatId, SEAT_ORDER, order_seats
 from app.engine.hand_history import format_hand_history
+from app.db.shared_aggregator import SharedAggregationWriter
 from app.storage.hand_store import HandStore
+from sqlalchemy.exc import SQLAlchemyError
 
 
 MatchStatus = Literal["waiting", "running", "paused", "stopped"]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -19,6 +24,7 @@ class SeatState:
     seat_id: SeatId
     ready: bool = False
     bot_name: str | None = None
+    bot_id: str | None = None
     uploaded_at: datetime | None = None
 
     def to_dict(self) -> dict:
@@ -26,6 +32,7 @@ class SeatState:
             "seat_id": self.seat_id,
             "ready": self.ready,
             "bot_name": self.bot_name,
+            "bot_id": self.bot_id,
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
         }
 
@@ -69,6 +76,7 @@ class MatchService:
             seat_id: SeatState(seat_id=seat_id) for seat_id in SEAT_ORDER
         }
         self._bots: dict[SeatId, BotRunner | None] = {seat_id: None for seat_id in SEAT_ORDER}
+        self._shared_aggregator = SharedAggregationWriter()
 
     def get_seats(self) -> list[dict]:
         with self._lock:
@@ -137,7 +145,13 @@ class MatchService:
             "history": history_text,
         }
 
-    def register_bot(self, seat_id: SeatId, bot_name: str, bot_path: Path | None = None) -> dict:
+    def register_bot(
+        self,
+        seat_id: SeatId,
+        bot_name: str,
+        bot_path: Path | None = None,
+        bot_id: str | None = None,
+    ) -> dict:
         if seat_id not in self._seats:
             raise ValueError(f"Invalid seat id: {seat_id}")
 
@@ -149,6 +163,7 @@ class MatchService:
             seat = self._seats[seat_id]
             seat.ready = True
             seat.bot_name = bot_name
+            seat.bot_id = bot_id
             seat.uploaded_at = now
 
             return seat.to_dict()
@@ -297,51 +312,88 @@ class MatchService:
         deltas = {seat_id: 0.0 for seat_id in SEAT_ORDER}
         for seat_id, delta_cents in result.deltas.items():
             deltas[seat_id] = delta_cents / 100
-        self._hands.append(
-            HandRecord(
-                hand_id=hand_id,
-                completed_at=datetime.now(timezone.utc),
-                summary=summary,
-                winners=result.winners,
-                pot=pot_size,
-                history_path=str(history_path),
-                deltas=deltas,
-                active_seats=active_seats,
-            )
+        record = HandRecord(
+            hand_id=hand_id,
+            completed_at=datetime.now(timezone.utc),
+            summary=summary,
+            winners=result.winners,
+            pot=pot_size,
+            history_path=str(history_path),
+            deltas=deltas,
+            active_seats=active_seats,
         )
+        self._hands.append(record)
+        if self._shared_aggregator.enabled:
+            try:
+                leaderboard_entries = self._shared_leaderboard_entries_locked()
+                winner_ids = [
+                    self._seats[seat_id].bot_id or seat_id for seat_id in result.winners
+                ]
+                delta_map = {
+                    (self._seats[seat_id].bot_id or seat_id): delta
+                    for seat_id, delta in deltas.items()
+                }
+                self._shared_aggregator.write_hand(
+                    hand_id=int(hand_id),
+                    completed_at=record.completed_at,
+                    pot=pot_size,
+                    winners=winner_ids,
+                    deltas=delta_map,
+                    leaderboard_entries=leaderboard_entries,
+                )
+            except SQLAlchemyError:
+                logger.warning("Failed to write shared aggregates", exc_info=True)
 
     def get_leaderboard(self) -> dict:
         with self._lock:
-            big_blind = self.engine.big_blind_cents / 100
-            stats = {
-                seat_id: {
-                    "seat_id": seat_id,
-                    "bot_name": self._seats[seat_id].bot_name,
-                    "hands_played": 0,
-                    "total_bb": 0.0,
-                    "bb_per_hand": 0.0,
-                }
-                for seat_id in SEAT_ORDER
+            return self._leaderboard_locked()
+
+    def _leaderboard_locked(self) -> dict:
+        big_blind = self.engine.big_blind_cents / 100
+        stats = {
+            seat_id: {
+                "seat_id": seat_id,
+                "bot_id": self._seats[seat_id].bot_id,
+                "bot_name": self._seats[seat_id].bot_name,
+                "hands_played": 0,
+                "total_bb": 0.0,
+                "bb_per_hand": 0.0,
             }
-            for record in self._hands:
-                for seat_id in record.active_seats:
-                    stats[seat_id]["hands_played"] += 1
-                for seat_id, delta in record.deltas.items():
-                    if big_blind:
-                        stats[seat_id]["total_bb"] += delta / big_blind
-            leaders = [
-                stat
-                for stat in stats.values()
-                if stat["bot_name"]
-            ]
-            for stat in leaders:
-                hands = stat["hands_played"]
-                stat["bb_per_hand"] = stat["total_bb"] / hands if hands else 0.0
-            leaders.sort(
-                key=lambda item: (item["bb_per_hand"], item["hands_played"]),
-                reverse=True,
+            for seat_id in SEAT_ORDER
+        }
+        for record in self._hands:
+            for seat_id in record.active_seats:
+                stats[seat_id]["hands_played"] += 1
+            for seat_id, delta in record.deltas.items():
+                if big_blind:
+                    stats[seat_id]["total_bb"] += delta / big_blind
+        leaders = [stat for stat in stats.values() if stat["bot_name"]]
+        for stat in leaders:
+            hands = stat["hands_played"]
+            stat["bb_per_hand"] = stat["total_bb"] / hands if hands else 0.0
+        leaders.sort(
+            key=lambda item: (item["bb_per_hand"], item["hands_played"]),
+            reverse=True,
+        )
+        return {"leaders": leaders, "big_blind": big_blind}
+
+    def _shared_leaderboard_entries_locked(self) -> list[dict]:
+        leaderboard = self._leaderboard_locked()
+        entries: list[dict] = []
+        now = datetime.now(timezone.utc)
+        for stat in leaderboard["leaders"]:
+            bot_id = stat.get("bot_id")
+            if not bot_id:
+                continue
+            entries.append(
+                {
+                    "bot_id": bot_id,
+                    "hands_played": stat["hands_played"],
+                    "bb_per_hand": stat["bb_per_hand"],
+                    "updated_at": now,
+                }
             )
-            return {"leaders": leaders, "big_blind": big_blind}
+        return entries
 
     def _ready_seats_locked(self) -> list[SeatId]:
         ready = [

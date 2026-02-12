@@ -1,0 +1,22 @@
+{
+  "bots": {
+    "aggressive_bot_07b27c41d2": {
+      "bot_id": "aggressive_bot_07b27c41d2",
+      "bot_name": "aggressive_bot.zip",
+      "created_at": "2026-02-12T02:47:25.086477+00:00",
+      "db_password": "Hw-57TAuopksQZSzPFBbDflw",
+      "db_user": "bot_aggressive_bot_07b27c41d2_rw",
+      "schema": "bot_aggressive_bot_07b27c41d2",
+      "updated_at": "2026-02-12T02:48:11.837743+00:00"
+    },
+    "conservative_bot_0089e51e69": {
+      "bot_id": "conservative_bot_0089e51e69",
+      "bot_name": "conservative_bot.zip",
+      "created_at": "2026-02-12T02:47:19.475204+00:00",
+      "db_password": "NC0imMU6vnlMOHHbE5ErnGD5",
+      "db_user": "bot_conservative_bot_0089e51e69_rw",
+      "schema": "bot_conservative_bot_0089e51e69",
+      "updated_at": "2026-02-12T02:47:29.641925+00:00"
+    }
+  }
+}

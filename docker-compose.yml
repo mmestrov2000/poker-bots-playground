@@ -11,6 +11,8 @@ services:
       - DB_SHARED_SCHEMA=${DB_SHARED_SCHEMA:-shared}
       - DB_PRIVATE_SCHEMA_PREFIX=${DB_PRIVATE_SCHEMA_PREFIX:-bot_}
       - DB_SSLMODE=${DB_SSLMODE:-disable}
+      - DB_SHARED_AGGREGATOR_USER=${DB_SHARED_AGGREGATOR_USER:-shared_aggregator}
+      - DB_SHARED_AGGREGATOR_PASSWORD=${DB_SHARED_AGGREGATOR_PASSWORD:-shared_aggregator}
     ports:
       - "8000:8000"
     volumes:

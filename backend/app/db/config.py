@@ -25,6 +25,8 @@ class DBConfig:
     shared_schema: str
     private_schema_prefix: str
     sslmode: str
+    shared_aggregator_user: str
+    shared_aggregator_password: str
     enabled: bool
 
     @property
@@ -53,6 +55,8 @@ def get_db_config() -> DBConfig:
         shared_schema=_env("DB_SHARED_SCHEMA", "shared"),
         private_schema_prefix=_env("DB_PRIVATE_SCHEMA_PREFIX", "bot_"),
         sslmode=_env("DB_SSLMODE", "disable"),
+        shared_aggregator_user=_env("DB_SHARED_AGGREGATOR_USER", "shared_aggregator"),
+        shared_aggregator_password=_env("DB_SHARED_AGGREGATOR_PASSWORD", "shared_aggregator"),
         enabled=enabled,
     )
 

@@ -125,8 +125,10 @@ def build_bot_image(
     build_context: Path,
     image_tag: str,
     docker_bin: str,
+    dockerfile: Path | None = None,
 ) -> None:
-    dockerfile = repo_root / "runtime" / "bot_runner" / "Dockerfile"
+    if dockerfile is None:
+        dockerfile = repo_root / "runtime" / "bot_runner" / "Dockerfile"
     if not dockerfile.exists():
         raise FileNotFoundError(dockerfile)
     _run_docker(

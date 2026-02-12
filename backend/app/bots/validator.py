@@ -4,7 +4,7 @@ import ast
 import io
 import zipfile
 
-from app.bots.security import MAX_BOT_SOURCE_BYTES, validate_archive_infos
+from app.bots.security import MAX_BOT_SOURCE_BYTES, MAX_REQUIREMENTS_BYTES, validate_archive_infos
 
 
 def validate_bot_archive(payload: bytes) -> tuple[bool, str | None]:
@@ -26,11 +26,24 @@ def validate_bot_archive(payload: bytes) -> tuple[bool, str | None]:
                 return False, f"bot.py exceeds {MAX_BOT_SOURCE_BYTES} byte limit"
 
             with archive.open(bot_info) as bot_file:
-                source = bot_file.read().decode("utf-8")
+                try:
+                    source = bot_file.read().decode("utf-8")
+                except UnicodeDecodeError:
+                    return False, "bot.py must be valid UTF-8 text"
+            requirements_member, req_error = select_requirements_member(archive.namelist())
+            if req_error:
+                return False, req_error
+            if requirements_member:
+                requirements_info = archive.getinfo(requirements_member)
+                if requirements_info.file_size > MAX_REQUIREMENTS_BYTES:
+                    return False, f"requirements.txt exceeds {MAX_REQUIREMENTS_BYTES} byte limit"
+                with archive.open(requirements_info) as req_file:
+                    try:
+                        req_file.read().decode("utf-8")
+                    except UnicodeDecodeError:
+                        return False, "requirements.txt must be valid UTF-8 text"
     except zipfile.BadZipFile:
         return False, "Upload is not a valid zip archive"
-    except UnicodeDecodeError:
-        return False, "bot.py must be valid UTF-8 text"
     except KeyError:
         return False, "bot.py was not found in the zip"
 
@@ -70,3 +83,30 @@ def select_bot_member(names: list[str]) -> tuple[str | None, str | None]:
         return None, "Archive contains multiple bot.py candidates"
 
     return None, "bot.py must exist at zip root or one top-level folder"
+
+
+def select_requirements_member(names: list[str]) -> tuple[str | None, str | None]:
+    candidates: list[str] = []
+    for name in names:
+        if name.endswith("/"):
+            continue
+        parts = [p for p in name.split("/") if p]
+        if parts and parts[-1] == "requirements.txt":
+            candidates.append(name)
+
+    if not candidates:
+        return None, None
+    if "requirements.txt" in candidates:
+        if len(candidates) == 1:
+            return "requirements.txt", None
+        return None, "Archive contains multiple requirements.txt candidates"
+
+    single_folder_candidates = [
+        name for name in candidates if len([p for p in name.split("/") if p]) == 2
+    ]
+    if len(single_folder_candidates) == 1 and len(candidates) == 1:
+        return single_folder_candidates[0], None
+    if len(single_folder_candidates) > 1 or len(candidates) > 1:
+        return None, "Archive contains multiple requirements.txt candidates"
+
+    return None, "requirements.txt must exist at zip root or one top-level folder"

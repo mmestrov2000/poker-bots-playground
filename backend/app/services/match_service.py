@@ -6,7 +6,7 @@ from threading import Event, Lock, Thread, current_thread
 from typing import Literal
 
 from app.bots.loader import load_bot_from_zip
-from app.bots.runtime import BotRunner
+from app.bots.runtime import BotClient, BotRunner
 from app.engine.game import PokerEngine, SeatId, SEAT_ORDER, order_seats
 from app.engine.hand_history import format_hand_history
 from app.db.shared_aggregator import SharedAggregationWriter
@@ -75,7 +75,7 @@ class MatchService:
         self._seats: dict[SeatId, SeatState] = {
             seat_id: SeatState(seat_id=seat_id) for seat_id in SEAT_ORDER
         }
-        self._bots: dict[SeatId, BotRunner | None] = {seat_id: None for seat_id in SEAT_ORDER}
+        self._bots: dict[SeatId, BotClient | None] = {seat_id: None for seat_id in SEAT_ORDER}
         self._shared_aggregator = SharedAggregationWriter()
 
     def get_seats(self) -> list[dict]:
@@ -151,15 +151,22 @@ class MatchService:
         bot_name: str,
         bot_path: Path | None = None,
         bot_id: str | None = None,
+        bot_runner: BotClient | None = None,
     ) -> dict:
         if seat_id not in self._seats:
             raise ValueError(f"Invalid seat id: {seat_id}")
 
         now = datetime.now(timezone.utc)
         with self._lock:
-            if bot_path is not None:
+            if bot_runner is None and bot_path is not None:
                 bot_instance = load_bot_from_zip(bot_path)
-                self._bots[seat_id] = BotRunner(bot=bot_instance, seat_id=seat_id)
+                bot_runner = BotRunner(bot=bot_instance, seat_id=seat_id)
+            if bot_runner is None:
+                raise ValueError("bot_runner or bot_path is required")
+            existing = self._bots.get(seat_id)
+            if existing is not None:
+                existing.stop()
+            self._bots[seat_id] = bot_runner
             seat = self._seats[seat_id]
             seat.ready = True
             seat.bot_name = bot_name
@@ -226,6 +233,9 @@ class MatchService:
             self._hands.clear()
             self._hand_counter = 0
             self._button_seat = None
+            for bot in self._bots.values():
+                if bot is not None:
+                    bot.stop()
             self._seats = {
                 seat_id: SeatState(seat_id=seat_id) for seat_id in SEAT_ORDER
             }

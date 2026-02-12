@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from app.api import routes
 from app.bots.registry import BotRegistry
+from app.bots.security import MAX_REQUIREMENTS_BYTES
 from app.services.match_service import HandRecord, MatchService
 from app.storage.hand_store import HandStore
 
@@ -35,18 +36,21 @@ def build_upload_file(filename: str, payload: bytes) -> FakeUploadFile:
 
 @pytest.fixture(autouse=True)
 def isolate_route_state(tmp_path, monkeypatch):
-    uploads_dir = tmp_path / "uploads"
-    uploads_dir.mkdir(parents=True, exist_ok=True)
+    artifacts_dir = tmp_path / "artifacts"
+    cache_dir = tmp_path / "artifact-cache"
     service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
     service.HAND_INTERVAL_SECONDS = 0.01
     registry = BotRegistry(path=tmp_path / "bots" / "registry.json")
 
-    monkeypatch.setattr(routes, "uploads_dir", uploads_dir)
     monkeypatch.setattr(routes, "match_service", service)
     monkeypatch.setattr(routes, "bot_registry", registry)
     monkeypatch.setattr(routes, "_shared_bootstrapped", False)
     monkeypatch.delenv("DB_HOST", raising=False)
     monkeypatch.setenv("DB_ENABLED", "0")
+    monkeypatch.setenv("BOT_ARTIFACT_BACKEND", "filesystem")
+    monkeypatch.setenv("BOT_ARTIFACTS_DIR", str(artifacts_dir))
+    monkeypatch.setenv("BOT_ARTIFACT_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("BOT_EXECUTION_MODE", "local")
     yield
     service.reset_match()
 
@@ -110,6 +114,52 @@ class PokerBot:
     assert response["seat"]["ready"] is True
     assert response["seat"]["bot_name"] == "nested.zip"
     assert response["seat"]["bot_id"]
+
+
+@pytest.mark.anyio
+async def test_upload_accepts_requirements_txt():
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+""",
+            "requirements.txt": "requests==2.32.3",
+        }
+    )
+
+    response = await routes.upload_bot("1", build_upload_file("deps.zip", payload))
+    assert response["seat"]["ready"] is True
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_multiple_requirements_candidates():
+    payload = build_zip(
+        {
+            "bot.py": "class PokerBot: pass",
+            "requirements.txt": "requests==2.32.3",
+            "nested/requirements.txt": "httpx==0.28.1",
+        }
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("1", build_upload_file("deps.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert "requirements.txt candidates" in exc_info.value.detail
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_large_requirements():
+    payload = build_zip(
+        {
+            "bot.py": "class PokerBot: pass",
+            "requirements.txt": "x" * (MAX_REQUIREMENTS_BYTES + 1),
+        }
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("1", build_upload_file("deps.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert "requirements.txt exceeds" in exc_info.value.detail
 
 
 @pytest.mark.anyio

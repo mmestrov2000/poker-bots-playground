@@ -93,12 +93,12 @@ def test_bot_runner_timeout_and_error() -> None:
         def act(self, state):
             raise RuntimeError("boom")
 
-    slow_runner = BotRunner(bot=SlowBot(), seat_id="A", timeout_seconds=0.01)
+    slow_runner = BotRunner(bot=SlowBot(), seat_id="1", timeout_seconds=0.01)
     result = slow_runner.act({"legal_actions": ["check"]})
     assert result["action"] == "fold"
     assert result.get("error") == "timeout"
 
-    error_runner = BotRunner(bot=ErrorBot(), seat_id="B", timeout_seconds=0.05)
+    error_runner = BotRunner(bot=ErrorBot(), seat_id="2", timeout_seconds=0.05)
     result = error_runner.act({"legal_actions": ["check"]})
     assert result["action"] == "fold"
     assert result.get("error", "").startswith("error:")
@@ -109,7 +109,7 @@ def test_bot_runner_invalid_response_falls_back() -> None:
         def act(self, state):
             return "check"
 
-    runner = BotRunner(bot=InvalidResponseBot(), seat_id="A", timeout_seconds=0.05)
+    runner = BotRunner(bot=InvalidResponseBot(), seat_id="1", timeout_seconds=0.05)
     result = runner.act({"legal_actions": ["check"]})
     assert result["action"] == "fold"
     assert result.get("error") == "invalid_response"
@@ -124,7 +124,7 @@ def test_bot_runner_rejects_large_state_without_calling_bot() -> None:
             calls += 1
             return {"action": "check"}
 
-    runner = BotRunner(bot=CountingBot(), seat_id="A", timeout_seconds=0.05)
+    runner = BotRunner(bot=CountingBot(), seat_id="1", timeout_seconds=0.05)
     huge_state = {"blob": "x" * MAX_STATE_BYTES}
     assert len(json.dumps(huge_state)) > MAX_STATE_BYTES
 
@@ -143,7 +143,7 @@ def test_bot_runner_rejects_invalid_state() -> None:
         def act(self, state):
             return {"action": "check"}
 
-    runner = BotRunner(bot=PassiveBot(), seat_id="A", timeout_seconds=0.05)
+    runner = BotRunner(bot=PassiveBot(), seat_id="1", timeout_seconds=0.05)
     result = runner.act({"bad": BadString()})
     assert result["action"] == "fold"
     assert result.get("error") == "invalid_state"

@@ -10,7 +10,7 @@
     <main class="layout">
       <header>
         <h1>Poker Bots Playground</h1>
-        <p>Heads-up No-Limit Texas Hold'em bot battle.</p>
+        <p>6-max No-Limit Texas Hold'em bot battle.</p>
       </header>
 
       <section class="arena">
@@ -18,21 +18,49 @@
           <section class="table-area">
             <div class="poker-table">
               <div class="table-center">
-                <span>Heads-Up Arena</span>
+                <span>6-Max NLH Arena</span>
               </div>
 
-              <article class="seat seat-a">
-                <h2>Seat A</h2>
-                <p id="seat-a-status" class="seat-status">Seat A empty</p>
-                <input id="seat-a-file" class="seat-input" type="file" accept=".zip" />
-                <button id="seat-a-take" class="seat-button">Take a seat</button>
+              <article class="seat seat-1">
+                <h2>Seat 1</h2>
+                <p id="seat-1-name" class="seat-name">Open seat</p>
+                <input id="seat-1-file" class="seat-input" type="file" accept=".zip" />
+                <button id="seat-1-take" class="seat-button">Take a seat</button>
               </article>
 
-              <article class="seat seat-b">
-                <h2>Seat B</h2>
-                <p id="seat-b-status" class="seat-status">Seat B empty</p>
-                <input id="seat-b-file" class="seat-input" type="file" accept=".zip" />
-                <button id="seat-b-take" class="seat-button">Take a seat</button>
+              <article class="seat seat-2">
+                <h2>Seat 2</h2>
+                <p id="seat-2-name" class="seat-name">Open seat</p>
+                <input id="seat-2-file" class="seat-input" type="file" accept=".zip" />
+                <button id="seat-2-take" class="seat-button">Take a seat</button>
+              </article>
+
+              <article class="seat seat-3">
+                <h2>Seat 3</h2>
+                <p id="seat-3-name" class="seat-name">Open seat</p>
+                <input id="seat-3-file" class="seat-input" type="file" accept=".zip" />
+                <button id="seat-3-take" class="seat-button">Take a seat</button>
+              </article>
+
+              <article class="seat seat-4">
+                <h2>Seat 4</h2>
+                <p id="seat-4-name" class="seat-name">Open seat</p>
+                <input id="seat-4-file" class="seat-input" type="file" accept=".zip" />
+                <button id="seat-4-take" class="seat-button">Take a seat</button>
+              </article>
+
+              <article class="seat seat-5">
+                <h2>Seat 5</h2>
+                <p id="seat-5-name" class="seat-name">Open seat</p>
+                <input id="seat-5-file" class="seat-input" type="file" accept=".zip" />
+                <button id="seat-5-take" class="seat-button">Take a seat</button>
+              </article>
+
+              <article class="seat seat-6">
+                <h2>Seat 6</h2>
+                <p id="seat-6-name" class="seat-name">Open seat</p>
+                <input id="seat-6-file" class="seat-input" type="file" accept=".zip" />
+                <button id="seat-6-take" class="seat-button">Take a seat</button>
               </article>
             </div>
           </section>
@@ -51,26 +79,19 @@
 
         <aside class="pnl-panel">
           <div class="pnl-header">
-            <h2>P&L</h2>
-            <p class="pnl-subtitle">Net by hand</p>
+            <h2>Leaderboard</h2>
+            <p class="pnl-subtitle">BB/hand</p>
           </div>
-          <div class="pnl-legend">
-            <div class="pnl-legend-item">
-              <span class="pnl-dot pnl-dot-a"></span>
-              <span id="pnl-label-a" class="pnl-label">Seat A</span>
-              <span id="pnl-value-a" class="pnl-value">$0.00</span>
-            </div>
-            <div class="pnl-legend-item">
-              <span class="pnl-dot pnl-dot-b"></span>
-              <span id="pnl-label-b" class="pnl-label">Seat B</span>
-              <span id="pnl-value-b" class="pnl-value">$0.00</span>
-            </div>
-          </div>
+          <ul id="leaderboard-list" class="leaderboard-list"></ul>
           <div class="pnl-chart">
             <svg id="pnl-chart" viewBox="0 0 640 280" preserveAspectRatio="none" aria-label="P&L graph">
               <line id="pnl-zero-line" x1="0" y1="140" x2="640" y2="140" />
-              <path id="pnl-line-a" />
-              <path id="pnl-line-b" />
+              <path id="pnl-line-1" class="pnl-line pnl-line-1" />
+              <path id="pnl-line-2" class="pnl-line pnl-line-2" />
+              <path id="pnl-line-3" class="pnl-line pnl-line-3" />
+              <path id="pnl-line-4" class="pnl-line pnl-line-4" />
+              <path id="pnl-line-5" class="pnl-line pnl-line-5" />
+              <path id="pnl-line-6" class="pnl-line pnl-line-6" />
             </svg>
             <div id="pnl-empty" class="pnl-empty">No hands yet.</div>
           </div>

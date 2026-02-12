@@ -49,15 +49,15 @@ def isolate_route_state(tmp_path, monkeypatch):
 async def test_upload_rejects_invalid_seat():
     payload = build_zip({"bot.py": "class PokerBot: pass"})
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("C", build_upload_file("bot.zip", payload))
+        await routes.upload_bot("7", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "seat_id must be A or B"
+    assert exc_info.value.detail == "seat_id must be 1-6"
 
 
 @pytest.mark.anyio
 async def test_upload_rejects_non_zip():
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.txt", b"not a zip"))
+        await routes.upload_bot("1", build_upload_file("bot.txt", b"not a zip"))
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Only .zip bot uploads are supported"
 
@@ -65,7 +65,7 @@ async def test_upload_rejects_non_zip():
 @pytest.mark.anyio
 async def test_upload_rejects_empty_payload():
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.zip", b""))
+        await routes.upload_bot("1", build_upload_file("bot.zip", b""))
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Upload payload is empty"
 
@@ -74,7 +74,7 @@ async def test_upload_rejects_empty_payload():
 async def test_upload_rejects_payloads_over_size_limit():
     oversized_payload = b"x" * ((10 * 1024 * 1024) + 1)
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.zip", oversized_payload))
+        await routes.upload_bot("1", build_upload_file("bot.zip", oversized_payload))
     assert exc_info.value.status_code == 413
     assert exc_info.value.detail == "Upload exceeds 10MB limit"
 
@@ -83,7 +83,7 @@ async def test_upload_rejects_payloads_over_size_limit():
 async def test_upload_rejects_missing_bot_file():
     payload = build_zip({"readme.txt": "no bot here"})
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+        await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "bot.py must exist at zip root or one top-level folder"
 
@@ -100,7 +100,7 @@ class PokerBot:
         }
     )
 
-    response = await routes.upload_bot("A", build_upload_file("nested.zip", payload))
+    response = await routes.upload_bot("1", build_upload_file("nested.zip", payload))
     assert response["seat"]["ready"] is True
     assert response["seat"]["bot_name"] == "nested.zip"
 
@@ -108,7 +108,7 @@ class PokerBot:
 @pytest.mark.anyio
 async def test_upload_rejects_invalid_zip_archive():
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.zip", b"not-a-real-zip"))
+        await routes.upload_bot("1", build_upload_file("bot.zip", b"not-a-real-zip"))
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Upload is not a valid zip archive"
 
@@ -117,7 +117,7 @@ async def test_upload_rejects_invalid_zip_archive():
 async def test_upload_rejects_unsafe_archive_paths():
     payload = build_zip({"../bot.py": "class PokerBot: pass"})
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+        await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Archive contains unsafe paths"
 
@@ -131,7 +131,7 @@ async def test_upload_rejects_archives_with_multiple_bot_candidates():
         }
     )
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+        await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Archive contains multiple bot.py candidates"
 
@@ -142,7 +142,7 @@ async def test_upload_rejects_archives_with_too_many_files():
     files["bot.py"] = "class PokerBot:\n    def act(self, state):\n        return {'action': 'check'}"
     payload = build_zip(files)
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+        await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
     assert "Archive contains too many files" in exc_info.value.detail
 
@@ -152,7 +152,7 @@ async def test_upload_rejects_large_bot_source_file():
     big_source = "class PokerBot:\n    pass\n" + ("#" * (256 * 1024))
     payload = build_zip({"bot.py": big_source})
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+        await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
     assert "bot.py exceeds" in exc_info.value.detail
 
@@ -161,7 +161,7 @@ async def test_upload_rejects_large_bot_source_file():
 async def test_upload_rejects_missing_pokerbot_class():
     payload = build_zip({"bot.py": "class NotBot: pass"})
     with pytest.raises(HTTPException) as exc_info:
-        await routes.upload_bot("A", build_upload_file("bot.zip", payload))
+        await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "bot.py must define a PokerBot class"
 
@@ -178,11 +178,11 @@ class PokerBot:
         }
     )
 
-    response_a = await routes.upload_bot("A", build_upload_file("alpha.zip", payload))
+    response_a = await routes.upload_bot("1", build_upload_file("alpha.zip", payload))
     assert response_a["seat"]["ready"] is True
     assert response_a["match"]["status"] == "waiting"
 
-    response_b = await routes.upload_bot("B", build_upload_file("beta.zip", payload))
+    response_b = await routes.upload_bot("2", build_upload_file("beta.zip", payload))
     assert response_b["match"]["status"] == "waiting"
 
     start_response = routes.start_match()
@@ -237,29 +237,79 @@ def test_get_pnl_returns_entries_and_last_hand_id():
                 hand_id="1",
                 completed_at=now,
                 summary="Hand #1",
-                winner="A",
+                winners=["1"],
                 pot=1.0,
                 history_path="1.txt",
+                deltas={
+                    "1": 1.0,
+                    "2": -1.0,
+                    "3": 0.0,
+                    "4": 0.0,
+                    "5": 0.0,
+                    "6": 0.0,
+                },
+                active_seats=["1", "2"],
             ),
             HandRecord(
                 hand_id="2",
                 completed_at=now,
                 summary="Hand #2",
-                winner="B",
+                winners=["2"],
                 pot=2.5,
                 history_path="2.txt",
+                deltas={
+                    "1": -2.5,
+                    "2": 2.5,
+                    "3": 0.0,
+                    "4": 0.0,
+                    "5": 0.0,
+                    "6": 0.0,
+                },
+                active_seats=["1", "2"],
             ),
         ]
 
     response = routes.get_pnl()
     assert response["last_hand_id"] == 2
     assert response["entries"] == [
-        {"hand_id": 1, "delta_a": 1.0, "delta_b": -1.0},
-        {"hand_id": 2, "delta_a": -2.5, "delta_b": 2.5},
+        {
+            "hand_id": 1,
+            "deltas": {
+                "1": 1.0,
+                "2": -1.0,
+                "3": 0.0,
+                "4": 0.0,
+                "5": 0.0,
+                "6": 0.0,
+            },
+        },
+        {
+            "hand_id": 2,
+            "deltas": {
+                "1": -2.5,
+                "2": 2.5,
+                "3": 0.0,
+                "4": 0.0,
+                "5": 0.0,
+                "6": 0.0,
+            },
+        },
     ]
 
     response = routes.get_pnl(since_hand_id=1)
-    assert response["entries"] == [{"hand_id": 2, "delta_a": -2.5, "delta_b": 2.5}]
+    assert response["entries"] == [
+        {
+            "hand_id": 2,
+            "deltas": {
+                "1": -2.5,
+                "2": 2.5,
+                "3": 0.0,
+                "4": 0.0,
+                "5": 0.0,
+                "6": 0.0,
+            },
+        }
+    ]
 
 
 def test_get_hand_returns_404_for_unknown_hand():

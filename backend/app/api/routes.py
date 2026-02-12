@@ -7,6 +7,7 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from app.bots.loader import BotLoadError, save_upload
 from app.bots.security import MAX_UPLOAD_BYTES
 from app.bots.validator import validate_bot_archive
+from app.engine.game import SEAT_ORDER
 from app.services.match_service import MatchService
 from app.storage.hand_store import HandStore
 
@@ -32,8 +33,8 @@ def get_seats() -> dict:
 @router.post("/seats/{seat_id}/bot")
 async def upload_bot(seat_id: str, bot_file: UploadFile = File(...)) -> dict:
     normalized_seat = seat_id.upper()
-    if normalized_seat not in {"A", "B"}:
-        raise HTTPException(status_code=400, detail="seat_id must be A or B")
+    if normalized_seat not in set(SEAT_ORDER):
+        raise HTTPException(status_code=400, detail="seat_id must be 1-6")
 
     filename = bot_file.filename or "bot.zip"
     if not filename.lower().endswith(".zip"):
@@ -138,6 +139,11 @@ def get_pnl(
 ) -> dict:
     entries, last_hand_id = match_service.list_pnl(since_hand_id=since_hand_id)
     return {"entries": entries, "last_hand_id": last_hand_id}
+
+
+@router.get("/leaderboard")
+def get_leaderboard() -> dict:
+    return match_service.get_leaderboard()
 
 
 @router.get("/hands/{hand_id}")

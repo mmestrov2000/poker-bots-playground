@@ -3,8 +3,32 @@ services:
     build: .
     environment:
       - APP_ASSET_VERSION=${APP_ASSET_VERSION:-dev}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-poker_bots}
+      - DB_ADMIN_USER=${DB_ADMIN_USER:-postgres}
+      - DB_ADMIN_PASSWORD=${DB_ADMIN_PASSWORD:-postgres}
+      - DB_SHARED_SCHEMA=${DB_SHARED_SCHEMA:-shared}
+      - DB_PRIVATE_SCHEMA_PREFIX=${DB_PRIVATE_SCHEMA_PREFIX:-bot_}
+      - DB_SSLMODE=${DB_SSLMODE:-disable}
     ports:
       - "8000:8000"
     volumes:
       - ./runtime:/app/runtime
     restart: unless-stopped
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=${DB_NAME:-poker_bots}
+      - POSTGRES_USER=${DB_ADMIN_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_ADMIN_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -10,14 +10,15 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 - `API Layer (FastAPI routes)`: REST endpoints for upload, status, hand summaries, and hand detail.
 - `Match Service`: Starts/stops match loop and coordinates hand simulation.
 - `Poker Engine`: Handles Texas Hold'em hand progression and action resolution.
-- `Bot Runner`: Loads user bot contract and executes `act` calls with timeout/error handling.
+- `Bot Runner`: Executes bot actions either locally or via containerized bot runners.
+- `Bot Artifact Store`: Persists uploaded bot ZIPs to filesystem or S3-compatible storage.
 - `Hand Store`: Persists hand summaries and hand history text to runtime files.
 - `Postgres (optional)`: Shared aggregates and per-bot schemas, bootstrapped via alembic.
 - `Bot Registry`: `runtime/bots/registry.json` tracks bot IDs and DB credentials.
 
 ## Runtime Flow
 1. User uploads bot to Seat 1-6 (`POST /seats/{seat_id}/bot`).
-2. API validates package shape and records seat occupancy.
+2. API validates package shape, stores the ZIP artifact, and starts a bot runner.
 3. When at least two seats are valid, Match Service sets match status to `running`.
 4. Match loop repeatedly simulates hands:
    - Shuffle deck.
@@ -48,9 +49,9 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 - `bot_template/` - starter upload package reference.
 - `bot_template/bot.py` - starter bot contract implementation.
 - `bot_template/README.md` - packaging and upload instructions.
-- `runtime/uploads/` - uploaded bot packages.
+- `runtime/artifacts/` - uploaded bot artifacts (filesystem backend).
 - `runtime/hands/` - generated hand history text files.
-- `runtime/bots/registry.json` - bot registry with DB credentials.
+- `runtime/bots/registry.json` - bot registry with DB credentials and artifact metadata.
 - `Dockerfile` - app container image.
 - `docker-compose.yml` - local orchestration.
 
@@ -105,10 +106,10 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 
 ## Security and Isolation
 - Restrict upload size and accepted archive type.
-- Validate expected bot entrypoint (`bot.py`, `PokerBot`).
+- Validate expected bot entrypoint (`bot.py`, `PokerBot`, optional `requirements.txt`).
 - Execute bot actions behind timeout guards.
 - Log bot exceptions and treat them as invalid actions.
-- Future hardening path: container-per-bot sandbox with no network and resource limits.
+- Container-per-bot sandbox uses resource limits and read-only filesystem defaults.
 
 ## Observability
 - Structured logs for:

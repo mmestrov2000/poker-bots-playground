@@ -67,9 +67,30 @@ class BotRegistry:
                 "schema": schema,
                 "db_user": db_user,
                 "db_password": _generate_password(),
+                "artifact": None,
+                "artifact_sha256": None,
+                "artifact_size_bytes": None,
+                "requirements_hash": None,
+                "image_tag": None,
+                "container_id": None,
+                "container_host": None,
+                "container_port": None,
+                "bot_entrypoint": None,
                 "created_at": now,
                 "updated_at": now,
             }
+        bots[bot_id] = entry
+        self._save(data)
+        return entry
+
+    def update_entry(self, bot_id: str, updates: dict) -> dict | None:
+        data = self._load()
+        bots = data.setdefault("bots", {})
+        entry = bots.get(bot_id)
+        if not entry:
+            return None
+        entry.update(updates)
+        entry["updated_at"] = _utc_now()
         bots[bot_id] = entry
         self._save(data)
         return entry

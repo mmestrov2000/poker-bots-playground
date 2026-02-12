@@ -5,13 +5,21 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+ARG DOCKER_GID=999
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 COPY backend /app/backend
 COPY frontend /app/frontend
 RUN adduser --disabled-password --gecos "" appuser \
-    && mkdir -p /app/runtime/uploads /app/runtime/hands \
+    && if ! getent group docker >/dev/null; then groupadd -g "${DOCKER_GID}" docker; fi \
+    && usermod -aG docker appuser \
+    && mkdir -p /app/runtime/uploads /app/runtime/hands /app/runtime/artifacts \
     && chown -R appuser:appuser /app
 
 ENV PYTHONPATH=/app/backend

@@ -63,6 +63,37 @@ DB_SHARED_AGGREGATOR_USER=shared_aggregator
 DB_SHARED_AGGREGATOR_PASSWORD=shared_aggregator
 ```
 
+### Bot Artifact Storage
+Docker compose also launches a MinIO (S3-compatible) service for bot ZIP artifacts.
+
+Default artifact environment variables (override as needed):
+```
+BOT_ARTIFACT_BACKEND=s3
+S3_ENDPOINT=http://minio:9000
+S3_BUCKET=bot-artifacts
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+S3_FORCE_PATH_STYLE=true
+```
+
+### Bot Execution Mode
+Bots can run locally (in-process) or inside Docker containers.
+
+Key environment variables:
+```
+BOT_EXECUTION_MODE=local|docker
+BOT_CONTAINER_HOST=127.0.0.1
+BOT_CONTAINER_TIMEOUT=2.0
+BOT_CONTAINER_CPU=0.5
+BOT_CONTAINER_MEM=256m
+BOT_CONTAINER_PIDS_LIMIT=128
+```
+
+When running the app container with `BOT_EXECUTION_MODE=docker`, mount the Docker socket:
+```
+/var/run/docker.sock:/var/run/docker.sock
+```
+
 ### Asset Versioning (Production)
 Set `APP_ASSET_VERSION` per deployment (for example to a git SHA or release tag) so browsers load new JS/CSS after deploy:
 

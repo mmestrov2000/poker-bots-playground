@@ -8,7 +8,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
-from app.bots.loader import BotLoadError, save_upload
+from app.bots.artifacts import ArtifactStore
+from app.bots.build import BotBuildError, build_bot_image_from_archive, inspect_bot_archive
+from app.bots.config import get_artifact_config, get_bot_execution_config
+from app.bots.container_runtime import DockerBotRunner
+from app.bots.loader import BotLoadError
 from app.bots.registry import BotRegistry, derive_bot_id
 from app.bots.security import MAX_UPLOAD_BYTES
 from app.bots.validator import validate_bot_archive
@@ -20,8 +24,6 @@ from app.storage.hand_store import HandStore
 
 router = APIRouter()
 repo_root = Path(__file__).resolve().parents[3]
-uploads_dir = repo_root / "runtime" / "uploads"
-uploads_dir.mkdir(parents=True, exist_ok=True)
 bot_registry = BotRegistry()
 logger = logging.getLogger(__name__)
 _shared_bootstrapped = False
@@ -58,21 +60,10 @@ async def upload_bot(seat_id: str, bot_file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=400, detail=error_message or "Invalid bot archive")
 
     bot_id = derive_bot_id(filename, payload)
-    bot_path = save_upload(
-        seat_id=normalized_seat,
-        filename=filename,
-        payload=payload,
-        uploads_dir=uploads_dir,
-    )
-    try:
-        seat = match_service.register_bot(
-            normalized_seat,
-            filename,
-            bot_path=bot_path,
-            bot_id=bot_id,
-        )
-    except BotLoadError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    artifact_store = ArtifactStore(get_artifact_config(repo_root))
+    artifact_ref = artifact_store.store(bot_id=bot_id, filename=filename, payload=payload)
+    artifact_path = artifact_store.fetch(artifact_ref)
+    execution_config = get_bot_execution_config()
     db_config = get_db_config()
     bot_schema = f"{db_config.private_schema_prefix}{bot_id}"
     db_user = f"{bot_schema}_rw"
@@ -82,6 +73,70 @@ async def upload_bot(seat_id: str, bot_file: UploadFile = File(...)) -> dict:
         schema=bot_schema,
         db_user=db_user,
     )
+    bot_registry.update_entry(
+        bot_id,
+        {
+            "artifact": artifact_ref.to_dict(),
+            "artifact_sha256": artifact_ref.sha256,
+            "artifact_size_bytes": artifact_ref.size_bytes,
+        },
+    )
+    bot_runner = None
+    try:
+        if execution_config.mode == "docker":
+            image_tag = f"poker-bot:{bot_id}-{artifact_ref.sha256[:8]}"
+            build_info = build_bot_image_from_archive(
+                artifact_path=artifact_path,
+                repo_root=repo_root,
+                image_tag=image_tag,
+                docker_bin=execution_config.docker_bin,
+            )
+            bot_runner = DockerBotRunner(
+                bot_id=bot_id,
+                image_tag=image_tag,
+                entrypoint=build_info.entrypoint,
+                config=execution_config,
+            )
+            container_info = bot_runner.start()
+            bot_registry.update_entry(
+                bot_id,
+                {
+                    "image_tag": image_tag,
+                    "requirements_hash": build_info.requirements_hash,
+                    "container_id": container_info.container_id,
+                    "container_host": container_info.host,
+                    "container_port": container_info.port,
+                    "bot_entrypoint": build_info.entrypoint,
+                },
+            )
+        else:
+            archive_info = inspect_bot_archive(artifact_path)
+            bot_registry.update_entry(
+                bot_id,
+                {
+                    "image_tag": None,
+                    "requirements_hash": archive_info.requirements_hash,
+                    "container_id": None,
+                    "container_host": None,
+                    "container_port": None,
+                    "bot_entrypoint": archive_info.entrypoint,
+                },
+            )
+    except BotBuildError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (subprocess.CalledProcessError, RuntimeError) as exc:
+        logger.warning("Bot container build failed", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to start bot container") from exc
+    try:
+        seat = match_service.register_bot(
+            normalized_seat,
+            filename,
+            bot_path=None if bot_runner else artifact_path,
+            bot_id=bot_id,
+            bot_runner=bot_runner,
+        )
+    except BotLoadError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     _maybe_bootstrap_db(db_config, registry_entry)
     return {"seat": seat, "match": match_service.get_match()}
 

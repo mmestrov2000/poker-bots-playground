@@ -3,11 +3,19 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 
 _EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="bot-runner")
 MAX_STATE_BYTES = 64 * 1024
+
+
+class BotClient(Protocol):
+    def act(self, state: dict) -> dict:
+        ...
+
+    def stop(self) -> None:
+        ...
 
 
 @dataclass
@@ -45,3 +53,6 @@ class BotRunner:
             except (TypeError, ValueError):
                 return {"action": "fold", "amount": 0, "error": "invalid_response"}
         return {"action": action, "amount": amount}
+
+    def stop(self) -> None:
+        return None

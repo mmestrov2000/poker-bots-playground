@@ -7,7 +7,7 @@ Create Date: 2025-09-11 00:00:00.000000
 
 from __future__ import annotations
 
-from alembic import op
+from alembic import context, op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
@@ -21,7 +21,7 @@ depends_on = None
 
 
 def _schema() -> str:
-    args = op.get_context().get_x_argument(as_dictionary=True)
+    args = context.get_x_argument(as_dictionary=True)
     schema = args.get("schema")
     if not schema:
         raise ValueError("schema is required; pass -x schema=<name>")

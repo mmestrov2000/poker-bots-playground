@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router as api_router
+from app.db.bootstrap import maybe_bootstrap_shared_schema
 
 
 def create_app() -> FastAPI:
@@ -36,6 +37,10 @@ def create_app() -> FastAPI:
             # Always revalidate HTML so browsers fetch the latest asset version token.
             response.headers["Cache-Control"] = "no-cache, must-revalidate"
             return response
+
+    @app.on_event("startup")
+    def bootstrap_shared_schema() -> None:
+        maybe_bootstrap_shared_schema(repo_root=repo_root)
 
     return app
 

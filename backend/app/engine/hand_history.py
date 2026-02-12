@@ -2,19 +2,17 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from app.engine.game import ActionEvent, Card, SeatId
+from app.engine.game import ActionEvent, Card, SeatId, order_seats
 
 
 def format_hand_history(
     *,
     hand_id: str,
-    winner: SeatId,
+    winners: list[SeatId],
     pot_size_cents: int,
-    seat_a_name: str,
-    seat_b_name: str,
+    seat_names: dict[SeatId, str],
     button: SeatId,
-    seat_a_cards: list[Card],
-    seat_b_cards: list[Card],
+    hole_cards: dict[SeatId, list[Card]],
     board: list[Card],
     actions: list[ActionEvent],
     small_blind_cents: int,
@@ -27,12 +25,14 @@ def format_hand_history(
     lines.append(f"Hand #{hand_id}")
     lines.append(f"Date: {timestamp}")
     lines.append("Game: Hold'em No Limit ($0.50/$1.00)")
-    lines.append(f"Seat A: {seat_a_name}")
-    lines.append(f"Seat B: {seat_b_name}")
+    ordered_seats = order_seats(seat_names.keys())
+    for seat in ordered_seats:
+        lines.append(f"Seat {seat}: {seat_names[seat]}")
     lines.append(f"Button: Seat {button}")
     lines.append("*** HOLE CARDS ***")
-    lines.append(f"Seat A: [{' '.join(str(card) for card in seat_a_cards)}]")
-    lines.append(f"Seat B: [{' '.join(str(card) for card in seat_b_cards)}]")
+    for seat in ordered_seats:
+        cards = " ".join(str(card) for card in hole_cards[seat])
+        lines.append(f"Seat {seat}: [{cards}]")
 
     by_street = _group_actions(actions)
     _append_street(lines, "PREFLOP", by_street.get("preflop", []))
@@ -56,7 +56,11 @@ def format_hand_history(
 
     lines.append("*** SUMMARY ***")
     lines.append(f"Total pot: ${pot_size_cents / 100:.2f}")
-    lines.append(f"Winner: Seat {winner}")
+    winner_label = ", ".join(f"Seat {seat}" for seat in winners)
+    if len(winners) == 1:
+        lines.append(f"Winner: {winner_label}")
+    else:
+        lines.append(f"Winners: {winner_label}")
     lines.append(f"Board: [{_cards_str(board)}]")
     lines.append(f"Blinds: ${small_blind_cents / 100:.2f}/${big_blind_cents / 100:.2f}")
 

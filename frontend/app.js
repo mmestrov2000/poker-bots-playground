@@ -1,5 +1,6 @@
 const apiBase = "/api/v1";
 const handDetailPlaceholder = "Select a hand to view full history.";
+const seatIds = ["1", "2", "3", "4", "5", "6"];
 let selectedHandId = null;
 let handHistoryVisible = false;
 let snapshotMaxHandId = null;
@@ -11,10 +12,10 @@ let latestMatch = null;
 let handDetailMode = "logs";
 let handDetailText = handDetailPlaceholder;
 let pnlLastHandId = null;
-let pnlPointsA = [];
-let pnlPointsB = [];
+let pnlPoints = {};
 let pnlRefreshing = false;
-let seatNames = { A: null, B: null };
+let seatNames = {};
+let pnlVisibility = {};
 
 const handDetailTabs = {
   logs: document.getElementById("hand-detail-logs"),
@@ -23,15 +24,13 @@ const handDetailTabs = {
 
 const pnlElements = {
   chart: document.getElementById("pnl-chart"),
-  lineA: document.getElementById("pnl-line-a"),
-  lineB: document.getElementById("pnl-line-b"),
   zeroLine: document.getElementById("pnl-zero-line"),
   empty: document.getElementById("pnl-empty"),
-  labelA: document.getElementById("pnl-label-a"),
-  labelB: document.getElementById("pnl-label-b"),
-  valueA: document.getElementById("pnl-value-a"),
-  valueB: document.getElementById("pnl-value-b"),
+  lines: Object.fromEntries(
+    seatIds.map((seatId) => [seatId, document.getElementById(`pnl-line-${seatId}`)])
+  ),
 };
+const leaderboardList = document.getElementById("leaderboard-list");
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, options);
@@ -44,60 +43,30 @@ async function request(path, options = {}) {
 
 function updateSeatStatus(seats) {
   const byId = Object.fromEntries(seats.map((seat) => [seat.seat_id, seat]));
-  const seatA = byId.A;
-  const seatB = byId.B;
+  let readyCount = 0;
 
-  const seatReadyA = Boolean(seatA?.ready);
-  const seatReadyB = Boolean(seatB?.ready);
+  seatIds.forEach((seatId) => {
+    const seat = byId[seatId];
+    const seatReady = Boolean(seat?.ready);
+    const name = seat?.bot_name || "Open seat";
+    seatNames[seatId] = seat?.bot_name || null;
 
-  seatNames = {
-    A: seatA?.bot_name || null,
-    B: seatB?.bot_name || null,
-  };
+    const nameEl = document.getElementById(`seat-${seatId}-name`);
+    if (nameEl) {
+      nameEl.textContent = name;
+    }
 
-  document.getElementById("seat-a-status").textContent = seatReadyA ? "Seat A taken" : "Seat A empty";
-  document.getElementById("seat-b-status").textContent = seatReadyB ? "Seat B taken" : "Seat B empty";
+    const seatButton = document.getElementById(`seat-${seatId}-take`);
+    const seatInput = document.getElementById(`seat-${seatId}-file`);
+    seatButton.disabled = seatReady;
+    seatInput.disabled = seatReady;
 
-  const seatAButton = document.getElementById("seat-a-take");
-  const seatBButton = document.getElementById("seat-b-take");
-  const seatAInput = document.getElementById("seat-a-file");
-  const seatBInput = document.getElementById("seat-b-file");
+    if (seatReady) {
+      readyCount += 1;
+    }
+  });
 
-  seatAButton.disabled = seatReadyA;
-  seatBButton.disabled = seatReadyB;
-  seatAInput.disabled = seatReadyA;
-  seatBInput.disabled = seatReadyB;
-
-  return seatReadyA && seatReadyB;
-}
-
-function formatCurrency(value) {
-  const absolute = Math.abs(value);
-  return `${value < 0 ? "-" : ""}$${absolute.toFixed(2)}`;
-}
-
-function updatePnlValueClass(element, value) {
-  element.classList.remove("pnl-positive", "pnl-negative");
-  if (value > 0) {
-    element.classList.add("pnl-positive");
-  } else if (value < 0) {
-    element.classList.add("pnl-negative");
-  }
-}
-
-function updatePnlLegend() {
-  const labelA = seatNames.A ? `Seat A (${seatNames.A})` : "Seat A";
-  const labelB = seatNames.B ? `Seat B (${seatNames.B})` : "Seat B";
-  const valueA = pnlPointsA.length ? pnlPointsA[pnlPointsA.length - 1].value : 0;
-  const valueB = pnlPointsB.length ? pnlPointsB[pnlPointsB.length - 1].value : 0;
-
-  pnlElements.labelA.textContent = labelA;
-  pnlElements.labelB.textContent = labelB;
-  pnlElements.valueA.textContent = formatCurrency(valueA);
-  pnlElements.valueB.textContent = formatCurrency(valueB);
-
-  updatePnlValueClass(pnlElements.valueA, valueA);
-  updatePnlValueClass(pnlElements.valueB, valueB);
+  return readyCount >= 2;
 }
 
 function renderHandDetail() {
@@ -123,24 +92,40 @@ function renderPnlChart() {
 
   const width = 640;
   const height = 280;
-  if (!pnlPointsA.length) {
-    pnlElements.lineA.setAttribute("d", "");
-    pnlElements.lineB.setAttribute("d", "");
-    pnlElements.zeroLine.setAttribute("x1", "0");
-    pnlElements.zeroLine.setAttribute("x2", width.toString());
-    const mid = height / 2;
-    pnlElements.zeroLine.setAttribute("y1", mid.toString());
-    pnlElements.zeroLine.setAttribute("y2", mid.toString());
+  const anyPoints = seatIds.some((seatId) => pnlPoints[seatId]?.length);
+  const visibleSeats = seatIds.filter((seatId) => pnlVisibility[seatId]);
+  const visibleSeries = visibleSeats.filter((seatId) => pnlPoints[seatId]?.length);
+
+  seatIds.forEach((seatId) => {
+    const line = pnlElements.lines[seatId];
+    if (line) {
+      line.setAttribute("d", "");
+    }
+  });
+
+  pnlElements.zeroLine.setAttribute("x1", "0");
+  pnlElements.zeroLine.setAttribute("x2", width.toString());
+  const mid = height / 2;
+  pnlElements.zeroLine.setAttribute("y1", mid.toString());
+  pnlElements.zeroLine.setAttribute("y2", mid.toString());
+
+  if (!anyPoints) {
+    pnlElements.empty.textContent = "No hands yet.";
+    pnlElements.empty.classList.remove("hidden");
+    return;
+  }
+
+  if (!visibleSeries.length) {
+    pnlElements.empty.textContent = "Select bots to display P&L.";
     pnlElements.empty.classList.remove("hidden");
     return;
   }
 
   pnlElements.empty.classList.add("hidden");
 
-  const values = [
-    ...pnlPointsA.map((point) => point.value),
-    ...pnlPointsB.map((point) => point.value),
-  ];
+  const values = visibleSeries.flatMap((seatId) =>
+    pnlPoints[seatId].map((point) => point.value)
+  );
   let minValue = Math.min(...values);
   let maxValue = Math.max(...values);
   if (minValue === maxValue) {
@@ -152,8 +137,11 @@ function renderPnlChart() {
     maxValue += padding;
   }
 
-  const minHand = pnlPointsA[0].handId;
-  const maxHand = pnlPointsA[pnlPointsA.length - 1].handId;
+  const handIds = visibleSeries.flatMap((seatId) =>
+    pnlPoints[seatId].map((point) => point.handId)
+  );
+  const minHand = Math.min(...handIds);
+  const maxHand = Math.max(...handIds);
   const xFor = (handId) => {
     if (maxHand === minHand) {
       return width / 2;
@@ -170,8 +158,13 @@ function renderPnlChart() {
       })
       .join(" ");
 
-  pnlElements.lineA.setAttribute("d", buildPath(pnlPointsA));
-  pnlElements.lineB.setAttribute("d", buildPath(pnlPointsB));
+  visibleSeries.forEach((seatId) => {
+    const line = pnlElements.lines[seatId];
+    if (!line) {
+      return;
+    }
+    line.setAttribute("d", buildPath(pnlPoints[seatId]));
+  });
 
   const zeroY = yFor(0);
   pnlElements.zeroLine.setAttribute("x1", "0");
@@ -182,10 +175,8 @@ function renderPnlChart() {
 
 function resetPnlState() {
   pnlLastHandId = null;
-  pnlPointsA = [];
-  pnlPointsB = [];
+  pnlPoints = Object.fromEntries(seatIds.map((seatId) => [seatId, []]));
   renderPnlChart();
-  updatePnlLegend();
 }
 
 function applyPnlEntries(entries) {
@@ -194,17 +185,63 @@ function applyPnlEntries(entries) {
     if (!Number.isFinite(handId)) {
       return;
     }
-    const lastHandId = pnlPointsA.length ? pnlPointsA[pnlPointsA.length - 1].handId : 0;
-    if (handId <= lastHandId) {
+    if (pnlLastHandId !== null && handId <= pnlLastHandId) {
       return;
     }
-    const deltaA = Number(entry.delta_a) || 0;
-    const deltaB = Number(entry.delta_b) || 0;
-    const lastValueA = pnlPointsA.length ? pnlPointsA[pnlPointsA.length - 1].value : 0;
-    const lastValueB = pnlPointsB.length ? pnlPointsB[pnlPointsB.length - 1].value : 0;
+    seatIds.forEach((seatId) => {
+      const delta = Number(entry.deltas?.[seatId]) || 0;
+      const lastValue = pnlPoints[seatId].length
+        ? pnlPoints[seatId][pnlPoints[seatId].length - 1].value
+        : 0;
+      pnlPoints[seatId].push({ handId, value: lastValue + delta });
+    });
+    pnlLastHandId = handId;
+  });
+}
 
-    pnlPointsA.push({ handId, value: lastValueA + deltaA });
-    pnlPointsB.push({ handId, value: lastValueB + deltaB });
+function updateLeaderboard(leaderboard) {
+  if (!leaderboardList) {
+    return;
+  }
+  leaderboardList.innerHTML = "";
+  const leaders = leaderboard?.leaders ?? [];
+  if (!leaders.length) {
+    const item = document.createElement("li");
+    item.className = "leaderboard-empty";
+    item.textContent = "No bots seated yet.";
+    leaderboardList.appendChild(item);
+    return;
+  }
+
+  leaders.forEach((leader) => {
+    const seatId = leader.seat_id;
+    if (!(seatId in pnlVisibility)) {
+      pnlVisibility[seatId] = true;
+    }
+    const item = document.createElement("li");
+    item.className = "leaderboard-item";
+
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = Boolean(pnlVisibility[seatId]);
+    checkbox.addEventListener("change", () => {
+      pnlVisibility[seatId] = checkbox.checked;
+      renderPnlChart();
+    });
+    const dot = document.createElement("span");
+    dot.className = `leaderboard-dot leaderboard-dot-${seatId}`;
+    const name = document.createElement("span");
+    name.textContent = `Seat ${seatId}${leader.bot_name ? ` (${leader.bot_name})` : ""}`;
+    label.append(checkbox, dot, name);
+
+    const stat = document.createElement("span");
+    const bbPerHand = Number(leader.bb_per_hand) || 0;
+    stat.className = "leaderboard-stat";
+    stat.textContent = `${bbPerHand.toFixed(2)} BB/hand`;
+
+    item.append(label, stat);
+    leaderboardList.appendChild(item);
   });
 }
 
@@ -226,7 +263,6 @@ async function refreshPnl() {
       pnlLastHandId = response.last_hand_id;
     }
     renderPnlChart();
-    updatePnlLegend();
   } catch (error) {
     console.error(error);
   } finally {
@@ -252,7 +288,7 @@ function updateMatchControls(match, seatsReady) {
 }
 
 async function uploadSeat(seatId) {
-  const input = document.getElementById(`seat-${seatId.toLowerCase()}-file`);
+  const input = document.getElementById(`seat-${seatId}-file`);
   const file = input.files?.[0];
   if (!file) {
     alert(`Select a .zip file for Seat ${seatId} first.`);
@@ -380,15 +416,20 @@ function clearHandHistory() {
 
 async function refreshState() {
   try {
-    const [seats, match] = await Promise.all([request("/seats"), request("/match")]);
+    const [seats, match, leaderboard] = await Promise.all([
+      request("/seats"),
+      request("/match"),
+      request("/leaderboard"),
+    ]);
 
     const seatsReady = updateSeatStatus(seats.seats);
     updateMatchStatus(match.match);
     updateMatchControls(match.match, seatsReady);
-    if (match.match.hands_played === 0 && (pnlPointsA.length || pnlPointsB.length)) {
+    updateLeaderboard(leaderboard);
+    const hasPnlPoints = seatIds.some((seatId) => pnlPoints[seatId]?.length);
+    if (match.match.hands_played === 0 && hasPnlPoints) {
       resetPnlState();
     }
-    updatePnlLegend();
     await refreshPnl();
   } catch (error) {
     console.error(error);
@@ -424,15 +465,20 @@ async function resetMatch() {
 }
 
 function wireEvents() {
-  const seatAInput = document.getElementById("seat-a-file");
-  const seatBInput = document.getElementById("seat-b-file");
   const logsTab = document.getElementById("hand-detail-logs");
   const replayTab = document.getElementById("hand-detail-replay");
 
-  document.getElementById("seat-a-take").addEventListener("click", () => seatAInput.click());
-  document.getElementById("seat-b-take").addEventListener("click", () => seatBInput.click());
-  seatAInput.addEventListener("change", () => uploadSeat("A").catch((error) => alert(error.message)));
-  seatBInput.addEventListener("change", () => uploadSeat("B").catch((error) => alert(error.message)));
+  seatIds.forEach((seatId) => {
+    const seatInput = document.getElementById(`seat-${seatId}-file`);
+    const seatButton = document.getElementById(`seat-${seatId}-take`);
+    if (!seatInput || !seatButton) {
+      return;
+    }
+    seatButton.addEventListener("click", () => seatInput.click());
+    seatInput.addEventListener("change", () =>
+      uploadSeat(seatId).catch((error) => alert(error.message))
+    );
+  });
 
   document.getElementById("start-match").addEventListener("click", () => startMatch().catch((error) => alert(error.message)));
   document.getElementById("pause-match").addEventListener("click", () => pauseMatch().catch((error) => alert(error.message)));

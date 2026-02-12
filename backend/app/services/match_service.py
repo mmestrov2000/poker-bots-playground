@@ -6,12 +6,11 @@ from typing import Literal
 
 from app.bots.loader import load_bot_from_zip
 from app.bots.runtime import BotRunner
-from app.engine.game import PokerEngine
+from app.engine.game import PokerEngine, SeatId, SEAT_ORDER, order_seats
 from app.engine.hand_history import format_hand_history
 from app.storage.hand_store import HandStore
 
 
-SeatId = Literal["A", "B"]
 MatchStatus = Literal["waiting", "running", "paused", "stopped"]
 
 
@@ -36,16 +35,18 @@ class HandRecord:
     hand_id: str
     completed_at: datetime
     summary: str
-    winner: SeatId
+    winners: list[SeatId]
     pot: float
     history_path: str
+    deltas: dict[SeatId, float]
+    active_seats: list[SeatId]
 
     def to_summary_dict(self) -> dict:
         return {
             "hand_id": self.hand_id,
             "completed_at": self.completed_at.isoformat(),
             "summary": self.summary,
-            "winner": self.winner,
+            "winners": self.winners,
             "pot": self.pot,
         }
 
@@ -63,15 +64,15 @@ class MatchService:
         self._started_at: datetime | None = None
         self._hands: list[HandRecord] = []
         self._hand_counter = 0
+        self._button_seat: SeatId | None = None
         self._seats: dict[SeatId, SeatState] = {
-            "A": SeatState(seat_id="A"),
-            "B": SeatState(seat_id="B"),
+            seat_id: SeatState(seat_id=seat_id) for seat_id in SEAT_ORDER
         }
-        self._bots: dict[SeatId, BotRunner | None] = {"A": None, "B": None}
+        self._bots: dict[SeatId, BotRunner | None] = {seat_id: None for seat_id in SEAT_ORDER}
 
     def get_seats(self) -> list[dict]:
         with self._lock:
-            return [self._seats["A"].to_dict(), self._seats["B"].to_dict()]
+            return [self._seats[seat_id].to_dict() for seat_id in SEAT_ORDER]
 
     def get_match(self) -> dict:
         with self._lock:
@@ -118,14 +119,7 @@ class MatchService:
                 last_hand_id = hand_number
                 if since_hand_id is not None and hand_number <= since_hand_id:
                     continue
-                delta_a = record.pot if record.winner == "A" else -record.pot
-                entries.append(
-                    {
-                        "hand_id": hand_number,
-                        "delta_a": delta_a,
-                        "delta_b": -delta_a,
-                    }
-                )
+                entries.append({"hand_id": hand_number, "deltas": record.deltas})
             return entries, last_hand_id
 
     def get_hand(self, hand_id: str) -> dict | None:
@@ -138,7 +132,7 @@ class MatchService:
             "hand_id": record.hand_id,
             "completed_at": record.completed_at.isoformat(),
             "summary": record.summary,
-            "winner": record.winner,
+            "winners": record.winners,
             "pot": record.pot,
             "history": history_text,
         }
@@ -166,8 +160,8 @@ class MatchService:
                 raise RuntimeError("Match already running")
             if self._status == "paused":
                 raise RuntimeError("Match is paused; use resume")
-            if not (self._seats["A"].ready and self._seats["B"].ready):
-                raise RuntimeError("Both seats must be ready to start")
+            if len(self._ready_seats_locked()) < 2:
+                raise RuntimeError("At least two seats must be ready to start")
             previous_status = self._status
             self._status = "running"
             if previous_status in {"waiting", "stopped"} or self._started_at is None:
@@ -190,8 +184,8 @@ class MatchService:
         with self._lock:
             if self._status != "paused":
                 raise RuntimeError("Match is not paused")
-            if not (self._seats["A"].ready and self._seats["B"].ready):
-                raise RuntimeError("Both seats must be ready to resume")
+            if len(self._ready_seats_locked()) < 2:
+                raise RuntimeError("At least two seats must be ready to resume")
             self._status = "running"
             if self._started_at is None:
                 self._started_at = datetime.now(timezone.utc)
@@ -216,11 +210,11 @@ class MatchService:
             self._started_at = None
             self._hands.clear()
             self._hand_counter = 0
+            self._button_seat = None
             self._seats = {
-                "A": SeatState(seat_id="A"),
-                "B": SeatState(seat_id="B"),
+                seat_id: SeatState(seat_id=seat_id) for seat_id in SEAT_ORDER
             }
-            self._bots = {"A": None, "B": None}
+            self._bots = {seat_id: None for seat_id in SEAT_ORDER}
             self._stop_event.set()
             thread = self._loop_thread
             self._loop_thread = None
@@ -255,30 +249,38 @@ class MatchService:
     def _simulate_hand_locked(self) -> None:
         self._hand_counter += 1
         hand_id = str(self._hand_counter)
-        seat_a_name = self._seats["A"].bot_name or "SeatA-Bot"
-        seat_b_name = self._seats["B"].bot_name or "SeatB-Bot"
+        active_seats = self._ready_seats_locked()
+        if len(active_seats) < 2:
+            self._status = "waiting"
+            self._started_at = None
+            return
 
-        bot_a = self._bots["A"]
-        bot_b = self._bots["B"]
-        if bot_a is None or bot_b is None:
+        button = self._next_button_seat(active_seats)
+        self._button_seat = button
+
+        seat_names = {
+            seat_id: self._seats[seat_id].bot_name or f"Seat{seat_id}-Bot"
+            for seat_id in active_seats
+        }
+        bots = {
+            seat_id: bot for seat_id, bot in self._bots.items() if seat_id in active_seats
+        }
+        if any(bot is None for bot in bots.values()):
             raise RuntimeError("match loop started without loaded bots")
 
         result = self.engine.play_hand(
             hand_id=hand_id,
-            bot_a=bot_a,
-            bot_b=bot_b,
-            seat_a_name=seat_a_name,
-            seat_b_name=seat_b_name,
+            bots=bots,
+            seat_names=seat_names,
+            button=button,
         )
         history = format_hand_history(
             hand_id=hand_id,
-            winner=result.winner,
+            winners=result.winners,
             pot_size_cents=result.pot_cents,
-            seat_a_name=seat_a_name,
-            seat_b_name=seat_b_name,
-            button=self.engine.button_for_hand(hand_id),
-            seat_a_cards=result.hole_cards["A"],
-            seat_b_cards=result.hole_cards["B"],
+            seat_names=seat_names,
+            button=button,
+            hole_cards=result.hole_cards,
             board=result.board,
             actions=result.actions,
             small_blind_cents=self.engine.small_blind_cents,
@@ -287,14 +289,70 @@ class MatchService:
         history_path = self.hand_store.save_hand(hand_id, history)
 
         pot_size = result.pot_cents / 100
-        summary = f"Hand #{hand_id}: Seat {result.winner} won ${pot_size:.2f}"
+        winners_label = ", ".join(f"Seat {seat}" for seat in result.winners)
+        if len(result.winners) == 1:
+            summary = f"Hand #{hand_id}: {winners_label} won ${pot_size:.2f}"
+        else:
+            summary = f"Hand #{hand_id}: {winners_label} split ${pot_size:.2f}"
+        deltas = {seat_id: 0.0 for seat_id in SEAT_ORDER}
+        for seat_id, delta_cents in result.deltas.items():
+            deltas[seat_id] = delta_cents / 100
         self._hands.append(
             HandRecord(
                 hand_id=hand_id,
                 completed_at=datetime.now(timezone.utc),
                 summary=summary,
-                winner=result.winner,
+                winners=result.winners,
                 pot=pot_size,
                 history_path=str(history_path),
+                deltas=deltas,
+                active_seats=active_seats,
             )
         )
+
+    def get_leaderboard(self) -> dict:
+        with self._lock:
+            big_blind = self.engine.big_blind_cents / 100
+            stats = {
+                seat_id: {
+                    "seat_id": seat_id,
+                    "bot_name": self._seats[seat_id].bot_name,
+                    "hands_played": 0,
+                    "total_bb": 0.0,
+                    "bb_per_hand": 0.0,
+                }
+                for seat_id in SEAT_ORDER
+            }
+            for record in self._hands:
+                for seat_id in record.active_seats:
+                    stats[seat_id]["hands_played"] += 1
+                for seat_id, delta in record.deltas.items():
+                    if big_blind:
+                        stats[seat_id]["total_bb"] += delta / big_blind
+            leaders = [
+                stat
+                for stat in stats.values()
+                if stat["bot_name"]
+            ]
+            for stat in leaders:
+                hands = stat["hands_played"]
+                stat["bb_per_hand"] = stat["total_bb"] / hands if hands else 0.0
+            leaders.sort(
+                key=lambda item: (item["bb_per_hand"], item["hands_played"]),
+                reverse=True,
+            )
+            return {"leaders": leaders, "big_blind": big_blind}
+
+    def _ready_seats_locked(self) -> list[SeatId]:
+        ready = [
+            seat_id
+            for seat_id, seat in self._seats.items()
+            if seat.ready and self._bots[seat_id] is not None
+        ]
+        return order_seats(ready)
+
+    def _next_button_seat(self, active_seats: list[SeatId]) -> SeatId:
+        if self._button_seat not in active_seats:
+            return active_seats[0]
+        index = active_seats.index(self._button_seat)
+        return active_seats[(index + 1) % len(active_seats)]

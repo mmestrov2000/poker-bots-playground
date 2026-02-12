@@ -1,12 +1,13 @@
 # Poker Bots Playground
 
-Web playground for heads-up No-Limit Texas Hold'em bot battles.
+Web playground for 2-6 player No-Limit Texas Hold'em bot battles.
 
 ## MVP Features
-- Two bot upload seats (`A` and `B`) in a web UI.
-- Automatic match start once both bots are uploaded.
+- Six bot upload seats (`1`-`6`) in a web UI.
+- Match controls for start/pause/resume/end once at least two bots are seated.
 - Continuous hand simulation with random outcomes.
 - Append-only hand list with per-hand text history view.
+- Leaderboard sorted by BB/hand with P&L line toggles.
 - Containerized runtime for local development and VPS deployment.
 
 ## Project Docs

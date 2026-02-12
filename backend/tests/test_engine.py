@@ -27,18 +27,17 @@ class ExplodingBot:
 
 def test_engine_play_hand_reaches_showdown() -> None:
     engine = PokerEngine(rng=Random(7))
-    bot_a = BotRunner(bot=CheckCallBot(), seat_id="A", timeout_seconds=0.5)
-    bot_b = BotRunner(bot=CheckCallBot(), seat_id="B", timeout_seconds=0.5)
+    bot_a = BotRunner(bot=CheckCallBot(), seat_id="1", timeout_seconds=0.5)
+    bot_b = BotRunner(bot=CheckCallBot(), seat_id="2", timeout_seconds=0.5)
 
     result = engine.play_hand(
         hand_id="1",
-        bot_a=bot_a,
-        bot_b=bot_b,
-        seat_a_name="alpha",
-        seat_b_name="beta",
+        bots={"1": bot_a, "2": bot_b},
+        seat_names={"1": "alpha", "2": "beta"},
+        button="1",
     )
 
-    assert result.winner in {"A", "B"}
+    assert set(result.winners).issubset({"1", "2"})
     assert len(result.board) == 5
     streets = {action.street for action in result.actions}
     assert {"preflop", "flop", "turn", "river"}.issubset(streets)
@@ -89,24 +88,24 @@ def test_normalize_action_raise_bounds() -> None:
 
 def test_engine_ends_hand_when_bot_runtime_fails_preflop() -> None:
     engine = PokerEngine(rng=Random(11))
-    bot_a = BotRunner(bot=ExplodingBot(), seat_id="A", timeout_seconds=0.5)
-    bot_b = BotRunner(bot=CheckCallBot(), seat_id="B", timeout_seconds=0.5)
+    bot_a = BotRunner(bot=ExplodingBot(), seat_id="1", timeout_seconds=0.5)
+    bot_b = BotRunner(bot=CheckCallBot(), seat_id="2", timeout_seconds=0.5)
 
     result = engine.play_hand(
         hand_id="1",
-        bot_a=bot_a,
-        bot_b=bot_b,
-        seat_a_name="alpha",
-        seat_b_name="beta",
+        bots={"1": bot_a, "2": bot_b},
+        seat_names={"1": "alpha", "2": "beta"},
+        button="1",
     )
 
-    assert result.winner == "B"
+    assert result.winners == ["2"]
     assert result.board == []
     assert any(action.action == "fold" and action.street == "preflop" for action in result.actions)
 
 
 def test_button_for_hand_alternates_by_hand_id() -> None:
     engine = PokerEngine(rng=Random(3))
-    assert engine.button_for_hand("1") == "A"
-    assert engine.button_for_hand("2") == "B"
-    assert engine.button_for_hand("not-a-number") == "A"
+    assert engine.button_for_hand("1", seats=["1", "2"]) == "1"
+    assert engine.button_for_hand("2", seats=["1", "2"]) == "2"
+    assert engine.button_for_hand("3", seats=["1", "2"]) == "1"
+    assert engine.button_for_hand("not-a-number", seats=["1", "2"]) == "1"

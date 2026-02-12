@@ -3,7 +3,7 @@
 ## Overview
 The MVP uses a single Python backend service (`FastAPI`) and a static web frontend.
 The backend manages bot uploads, match state, hand simulation, and hand history storage.
-The frontend provides two bot upload slots plus live hand list and hand detail views.
+The frontend provides six bot upload slots plus live hand list and hand detail views.
 
 ## High-Level Components
 - `Frontend (static HTML/CSS/JS)`: Upload bots, display seat status, show hands, open hand text.
@@ -14,9 +14,9 @@ The frontend provides two bot upload slots plus live hand list and hand detail v
 - `Hand Store`: Persists hand summaries and hand history text to runtime files.
 
 ## Runtime Flow
-1. User uploads bot to Seat A or Seat B (`POST /seats/{seat_id}/bot`).
+1. User uploads bot to Seat 1-6 (`POST /seats/{seat_id}/bot`).
 2. API validates package shape and records seat occupancy.
-3. When both seats are valid, Match Service sets match status to `running`.
+3. When at least two seats are valid, Match Service sets match status to `running`.
 4. Match loop repeatedly simulates hands:
    - Shuffle deck.
    - Execute preflop/flop/turn/river actions via Bot Runner.
@@ -49,7 +49,7 @@ The frontend provides two bot upload slots plus live hand list and hand detail v
 
 ## State Model (MVP)
 ### `SeatState`
-- `seat_id`: `A|B`
+- `seat_id`: `1-6`
 - `bot_name`: uploaded filename or bot identifier
 - `ready`: bool
 - `uploaded_at`: timestamp
@@ -64,7 +64,7 @@ The frontend provides two bot upload slots plus live hand list and hand detail v
 - `hand_id`: string
 - `completed_at`: timestamp
 - `summary`: string
-- `winner`: `A|B`
+- `winners`: list of seat ids
 - `pot`: numeric
 - `history_path`: filesystem path
 
@@ -72,6 +72,8 @@ The frontend provides two bot upload slots plus live hand list and hand detail v
 - Prefix: `/api/v1`
 - Stateless HTTP API over JSON except hand history detail payload which includes raw text field.
 - MVP data storage is memory + local files.
+- `GET /leaderboard` returns per-seat BB/hand stats for the UI.
+- Leaderboard stats are computed from per-hand deltas.
 
 ## Decisions
 - Decision: `FastAPI` for backend.

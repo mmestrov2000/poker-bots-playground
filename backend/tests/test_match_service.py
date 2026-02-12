@@ -32,8 +32,8 @@ def test_registering_both_seats_starts_match(tmp_path: Path) -> None:
     bot_a = _write_bot_zip(tmp_path, "alpha.zip", bot_body)
     bot_b = _write_bot_zip(tmp_path, "beta.zip", bot_body)
 
-    service.register_bot("A", "alpha.zip", bot_path=bot_a)
-    service.register_bot("B", "beta.zip", bot_path=bot_b)
+    service.register_bot("1", "alpha.zip", bot_path=bot_a)
+    service.register_bot("2", "beta.zip", bot_path=bot_b)
 
     match = service.get_match()
     assert match["status"] == "waiting"
@@ -81,8 +81,8 @@ def test_reset_match_clears_state(tmp_path: Path) -> None:
     bot_a = _write_bot_zip(tmp_path, "alpha.zip", bot_body)
     bot_b = _write_bot_zip(tmp_path, "beta.zip", bot_body)
 
-    service.register_bot("A", "alpha.zip", bot_path=bot_a)
-    service.register_bot("B", "beta.zip", bot_path=bot_b)
+    service.register_bot("1", "alpha.zip", bot_path=bot_a)
+    service.register_bot("2", "beta.zip", bot_path=bot_b)
 
     service.start_match()
     sleep(0.1)
@@ -105,9 +105,11 @@ def test_list_hands_paginates_with_snapshot(tmp_path: Path) -> None:
                 hand_id=str(hand_id),
                 completed_at=now,
                 summary=f"Hand #{hand_id}",
-                winner="A",
+                winners=["1"],
                 pot=1.0,
                 history_path=f"{hand_id}.txt",
+                deltas={str(seat_id): 0.0 for seat_id in range(1, 7)},
+                active_seats=["1", "2"],
             )
             for hand_id in range(1, 6)
         ]
@@ -132,41 +134,118 @@ def test_list_pnl_returns_deltas_and_last_hand_id(tmp_path: Path) -> None:
                 hand_id="1",
                 completed_at=now,
                 summary="Hand #1",
-                winner="A",
+                winners=["1"],
                 pot=1.0,
                 history_path="1.txt",
+                deltas={
+                    "1": 1.0,
+                    "2": -1.0,
+                    "3": 0.0,
+                    "4": 0.0,
+                    "5": 0.0,
+                    "6": 0.0,
+                },
+                active_seats=["1", "2"],
             ),
             HandRecord(
                 hand_id="2",
                 completed_at=now,
                 summary="Hand #2",
-                winner="B",
+                winners=["2"],
                 pot=2.0,
                 history_path="2.txt",
+                deltas={
+                    "1": -2.0,
+                    "2": 2.0,
+                    "3": 0.0,
+                    "4": 0.0,
+                    "5": 0.0,
+                    "6": 0.0,
+                },
+                active_seats=["1", "2"],
             ),
             HandRecord(
                 hand_id="3",
                 completed_at=now,
                 summary="Hand #3",
-                winner="A",
+                winners=["1"],
                 pot=1.5,
                 history_path="3.txt",
+                deltas={
+                    "1": 1.5,
+                    "2": -1.5,
+                    "3": 0.0,
+                    "4": 0.0,
+                    "5": 0.0,
+                    "6": 0.0,
+                },
+                active_seats=["1", "2"],
             ),
         ]
 
     entries, last_hand_id = service.list_pnl()
     assert last_hand_id == 3
     assert entries == [
-        {"hand_id": 1, "delta_a": 1.0, "delta_b": -1.0},
-        {"hand_id": 2, "delta_a": -2.0, "delta_b": 2.0},
-        {"hand_id": 3, "delta_a": 1.5, "delta_b": -1.5},
+        {
+            "hand_id": 1,
+            "deltas": {
+                "1": 1.0,
+                "2": -1.0,
+                "3": 0.0,
+                "4": 0.0,
+                "5": 0.0,
+                "6": 0.0,
+            },
+        },
+        {
+            "hand_id": 2,
+            "deltas": {
+                "1": -2.0,
+                "2": 2.0,
+                "3": 0.0,
+                "4": 0.0,
+                "5": 0.0,
+                "6": 0.0,
+            },
+        },
+        {
+            "hand_id": 3,
+            "deltas": {
+                "1": 1.5,
+                "2": -1.5,
+                "3": 0.0,
+                "4": 0.0,
+                "5": 0.0,
+                "6": 0.0,
+            },
+        },
     ]
 
     entries, last_hand_id = service.list_pnl(since_hand_id=1)
     assert last_hand_id == 3
     assert entries == [
-        {"hand_id": 2, "delta_a": -2.0, "delta_b": 2.0},
-        {"hand_id": 3, "delta_a": 1.5, "delta_b": -1.5},
+        {
+            "hand_id": 2,
+            "deltas": {
+                "1": -2.0,
+                "2": 2.0,
+                "3": 0.0,
+                "4": 0.0,
+                "5": 0.0,
+                "6": 0.0,
+            },
+        },
+        {
+            "hand_id": 3,
+            "deltas": {
+                "1": 1.5,
+                "2": -1.5,
+                "3": 0.0,
+                "4": 0.0,
+                "5": 0.0,
+                "6": 0.0,
+            },
+        },
     ]
 
 
@@ -194,11 +273,58 @@ def test_match_loop_runtime_error_stops_match_safely(tmp_path: Path) -> None:
     bot_a = _write_bot_zip(tmp_path, "alpha.zip", bot_body)
     bot_b = _write_bot_zip(tmp_path, "beta.zip", bot_body)
 
-    service.register_bot("A", "alpha.zip", bot_path=bot_a)
-    service.register_bot("B", "beta.zip", bot_path=bot_b)
+    service.register_bot("1", "alpha.zip", bot_path=bot_a)
+    service.register_bot("2", "beta.zip", bot_path=bot_b)
 
     service.start_match()
     sleep(0.05)
     match = service.get_match()
     assert match["status"] == "waiting"
     assert match["hands_played"] == 0
+
+
+def test_leaderboard_sorts_by_bb_per_hand(tmp_path: Path) -> None:
+    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    now = datetime.now(timezone.utc)
+    with service._lock:
+        service._seats["1"].bot_name = "alpha"
+        service._seats["2"].bot_name = "beta"
+        service._hands = [
+            HandRecord(
+                hand_id="1",
+                completed_at=now,
+                summary="Hand #1",
+                winners=["1"],
+                pot=2.0,
+                history_path="1.txt",
+                deltas={
+                    "1": 2.0,
+                    "2": -2.0,
+                    "3": 0.0,
+                    "4": 0.0,
+                    "5": 0.0,
+                    "6": 0.0,
+                },
+                active_seats=["1", "2"],
+            ),
+            HandRecord(
+                hand_id="2",
+                completed_at=now,
+                summary="Hand #2",
+                winners=["1"],
+                pot=1.0,
+                history_path="2.txt",
+                deltas={
+                    "1": 1.0,
+                    "2": -1.0,
+                    "3": 0.0,
+                    "4": 0.0,
+                    "5": 0.0,
+                    "6": 0.0,
+                },
+                active_seats=["1", "2"],
+            ),
+        ]
+
+    leaderboard = service.get_leaderboard()
+    assert [leader["seat_id"] for leader in leaderboard["leaders"]] == ["1", "2"]

@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.api import routes
+from app.bots.registry import BotRegistry
 from app.services.match_service import HandRecord, MatchService
 from app.storage.hand_store import HandStore
 
@@ -38,9 +39,14 @@ def isolate_route_state(tmp_path, monkeypatch):
     uploads_dir.mkdir(parents=True, exist_ok=True)
     service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
     service.HAND_INTERVAL_SECONDS = 0.01
+    registry = BotRegistry(path=tmp_path / "bots" / "registry.json")
 
     monkeypatch.setattr(routes, "uploads_dir", uploads_dir)
     monkeypatch.setattr(routes, "match_service", service)
+    monkeypatch.setattr(routes, "bot_registry", registry)
+    monkeypatch.setattr(routes, "_shared_bootstrapped", False)
+    monkeypatch.delenv("DB_HOST", raising=False)
+    monkeypatch.setenv("DB_ENABLED", "0")
     yield
     service.reset_match()
 
@@ -103,6 +109,33 @@ class PokerBot:
     response = await routes.upload_bot("1", build_upload_file("nested.zip", payload))
     assert response["seat"]["ready"] is True
     assert response["seat"]["bot_name"] == "nested.zip"
+    assert response["seat"]["bot_id"]
+
+
+@pytest.mark.anyio
+async def test_upload_creates_registry_entry_with_stable_password():
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+"""
+        }
+    )
+    response = await routes.upload_bot("1", build_upload_file("alpha.zip", payload))
+    bot_id = response["seat"]["bot_id"]
+    entry = routes.bot_registry.get(bot_id)
+    assert entry is not None
+    assert entry["bot_name"] == "alpha.zip"
+    assert entry["schema"] == f"bot_{bot_id}"
+    assert entry["db_user"] == f"bot_{bot_id}_rw"
+    first_password = entry["db_password"]
+
+    response_second = await routes.upload_bot("2", build_upload_file("alpha.zip", payload))
+    assert response_second["seat"]["bot_id"] == bot_id
+    entry_second = routes.bot_registry.get(bot_id)
+    assert entry_second["db_password"] == first_password
 
 
 @pytest.mark.anyio
@@ -317,3 +350,30 @@ def test_get_hand_returns_404_for_unknown_hand():
         routes.get_hand("missing-hand")
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Hand not found"
+
+
+@pytest.mark.anyio
+async def test_db_info_returns_registry_details():
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+"""
+        }
+    )
+    response = await routes.upload_bot("1", build_upload_file("alpha.zip", payload))
+    bot_id = response["seat"]["bot_id"]
+    info = routes.get_db_info(bot_id)
+    assert info["schema"] == f"bot_{bot_id}"
+    assert info["user"] == f"bot_{bot_id}_rw"
+    assert info["enabled"] is False
+    assert info["shared_schema"] == "shared"
+    assert info["password"]
+
+
+def test_db_info_unknown_bot_raises_404():
+    with pytest.raises(HTTPException) as exc_info:
+        routes.get_db_info("missing-bot")
+    assert exc_info.value.status_code == 404

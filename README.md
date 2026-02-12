@@ -47,6 +47,22 @@ docker compose up --build
 
 Open `http://localhost:8000`.
 
+### Optional Postgres Storage
+Docker compose now launches a Postgres service for shared aggregates and per-bot schemas. Bot DB credentials are stored in `runtime/bots/registry.json` and exposed via `GET /api/v1/bots/{bot_id}/db-info`.
+
+Default DB environment variables (override as needed):
+```
+DB_HOST=postgres
+DB_PORT=5432
+DB_NAME=poker_bots
+DB_ADMIN_USER=postgres
+DB_ADMIN_PASSWORD=postgres
+DB_SHARED_SCHEMA=shared
+DB_PRIVATE_SCHEMA_PREFIX=bot_
+DB_SHARED_AGGREGATOR_USER=shared_aggregator
+DB_SHARED_AGGREGATOR_PASSWORD=shared_aggregator
+```
+
 ### Asset Versioning (Production)
 Set `APP_ASSET_VERSION` per deployment (for example to a git SHA or release tag) so browsers load new JS/CSS after deploy:
 

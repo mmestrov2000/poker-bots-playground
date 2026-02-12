@@ -1,7 +1,7 @@
 # Architecture: Poker Bots Playground MVP
 
 ## Overview
-The MVP uses a single Python backend service (`FastAPI`) and a static web frontend.
+The MVP uses a single Python backend service (`FastAPI`) and a static web frontend, with optional Postgres-backed storage for shared aggregates and per-bot schemas.
 The backend manages bot uploads, match state, hand simulation, and hand history storage.
 The frontend provides six bot upload slots plus live hand list and hand detail views.
 
@@ -12,6 +12,8 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 - `Poker Engine`: Handles Texas Hold'em hand progression and action resolution.
 - `Bot Runner`: Loads user bot contract and executes `act` calls with timeout/error handling.
 - `Hand Store`: Persists hand summaries and hand history text to runtime files.
+- `Postgres (optional)`: Shared aggregates and per-bot schemas, bootstrapped via alembic.
+- `Bot Registry`: `runtime/bots/registry.json` tracks bot IDs and DB credentials.
 
 ## Runtime Flow
 1. User uploads bot to Seat 1-6 (`POST /seats/{seat_id}/bot`).
@@ -23,6 +25,7 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
    - Resolve winner/pot.
    - Generate summary + full hand history text.
    - Save hand record in memory and filesystem.
+   - (Optional) Write shared aggregates to Postgres.
 5. Frontend polls hand list and appends new rows.
 6. User opens hand detail view from list item (`GET /hands/{hand_id}`).
 
@@ -34,6 +37,9 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 - `backend/app/engine/` - poker-domain logic and hand history formatting.
 - `backend/app/bots/` - bot contract loading and execution wrappers.
 - `backend/app/storage/` - runtime file persistence helpers.
+- `backend/app/db/` - DB config and shared aggregation writer.
+- `backend/alembic/` - Postgres migrations.
+- `backend/scripts/db_bootstrap.py` - schema/user bootstrap helper.
 - `backend/tests/` - backend test suite.
 - `frontend/` - static UI assets.
 - `frontend/index.html` - upload and hand list UI.
@@ -44,6 +50,7 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 - `bot_template/README.md` - packaging and upload instructions.
 - `runtime/uploads/` - uploaded bot packages.
 - `runtime/hands/` - generated hand history text files.
+- `runtime/bots/registry.json` - bot registry with DB credentials.
 - `Dockerfile` - app container image.
 - `docker-compose.yml` - local orchestration.
 
@@ -51,6 +58,7 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 ### `SeatState`
 - `seat_id`: `1-6`
 - `bot_name`: uploaded filename or bot identifier
+- `bot_id`: stable ID for registry/DB mapping
 - `ready`: bool
 - `uploaded_at`: timestamp
 
@@ -68,12 +76,19 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 - `pot`: numeric
 - `history_path`: filesystem path
 
+### `BotRegistryEntry`
+- `bot_id`: stable ID derived from upload
+- `schema`: Postgres schema name
+- `db_user`: per-bot DB user
+- `db_password`: per-bot DB password
+
 ## API Design
 - Prefix: `/api/v1`
 - Stateless HTTP API over JSON except hand history detail payload which includes raw text field.
 - MVP data storage is memory + local files.
 - `GET /leaderboard` returns per-seat BB/hand stats for the UI.
 - Leaderboard stats are computed from per-hand deltas.
+- `GET /bots/{bot_id}/db-info` returns Postgres connection info for the bot.
 
 ## Decisions
 - Decision: `FastAPI` for backend.

@@ -20,7 +20,7 @@ Users upload bots into Seats 1-6. Once at least two seats are filled, the backen
 - Tournament formats or multi-table support.
 - Real-money integration.
 - Advanced analytics, EV reports, or strategy dashboards.
-- Long-term persistent storage beyond local runtime files.
+- Long-term persistent storage beyond optional Postgres bot/shared schemas.
 
 ## Scope
 ### In Scope
@@ -30,6 +30,7 @@ Users upload bots into Seats 1-6. Once at least two seats are filled, the backen
 - Backend match loop that runs hands after at least two bots are uploaded.
 - Hand summary list and detailed hand history viewer.
 - Containerized local run and deployable image.
+- Optional Postgres-backed shared aggregates and per-bot schemas.
 
 ### Out of Scope
 - Multi-match scheduling.
@@ -63,6 +64,7 @@ Users upload bots into Seats 1-6. Once at least two seats are filled, the backen
 - `FR-10`: Bot decision calls have a timeout and invalid actions are handled safely.
 - `FR-11`: User can reset the current match and clear in-memory state.
 - `FR-12`: UI displays leaderboard sorted by BB/hand and allows toggling P&L lines per bot.
+- `FR-13`: Backend exposes bot DB connection info when Postgres is enabled.
 
 ## Non-Functional Requirements
 - `NFR-01` Correctness: Betting/action sequence must respect NLHE rules for 2-6 players.
@@ -92,6 +94,7 @@ Runtime behavior:
 - `GET /api/v1/health`
 - `GET /api/v1/seats`
 - `POST /api/v1/seats/{seat_id}/bot` (seat_id 1-6)
+- `GET /api/v1/bots/{bot_id}/db-info`
 - `GET /api/v1/match`
 - `POST /api/v1/match/reset`
 - `GET /api/v1/hands?page=1&page_size=100&max_hand_id=123`

@@ -77,7 +77,8 @@ Users upload bots into Seats 1-6. Once at least two seats are filled, the backen
 ## Bot Contract (MVP)
 Bot package requirements:
 - Upload a `.zip` file.
-- Include `bot.py` at package root.
+- Include `bot.py` at package root or one top-level folder.
+- Optional `requirements.txt` at the same level as `bot.py`.
 - Expose class `PokerBot` with method:
 
 ```python

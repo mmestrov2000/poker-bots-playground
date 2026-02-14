@@ -187,7 +187,7 @@ Goal: add authenticated user flow and owned bot management UX.
   - Keep compatibility with existing match-start behavior.
   - Acceptance: Seating works through either select-existing or inline-upload without regressions.
   - Test Strategy: Integration tests for both seat paths and match start trigger.
-- [ ] `M4-T7` Add test coverage for auth and bot-management flows (owner: `test-agent`)
+- [x] `M4-T7` Add test coverage for auth and bot-management flows (owner: `test-agent`)
   - Subtasks:
   - Add backend tests for auth/session lifecycle and My Bots ownership boundaries.
   - Add regression tests for seat select/upload branch behavior.

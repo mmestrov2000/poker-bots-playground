@@ -624,6 +624,53 @@ def test_auth_login_failure_returns_401():
     assert exc_info.value.detail == "Invalid username or password"
 
 
+@pytest.mark.anyio
+async def test_inline_upload_and_seat_selection_do_not_auto_start_match():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+"""
+        }
+    )
+    alpha = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("alpha.zip", payload),
+        name="Alpha",
+        version="1.0.0",
+    )
+    beta = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("beta.zip", payload),
+        name="Beta",
+        version="2.0.0",
+    )
+
+    first_select = routes.select_bot_for_seat(
+        table_id="default",
+        seat_id="1",
+        payload=routes.SelectBotRequest(bot_id=alpha["bot"]["bot_id"]),
+        current_user=current_user,
+    )
+    second_select = routes.select_bot_for_seat(
+        table_id="default",
+        seat_id="2",
+        payload=routes.SelectBotRequest(bot_id=beta["bot"]["bot_id"]),
+        current_user=current_user,
+    )
+    assert first_select["match"]["status"] == "waiting"
+    assert second_select["match"]["status"] == "waiting"
+
+    before_start = routes.get_match()
+    assert before_start["match"]["status"] == "waiting"
+
+    started = routes.start_match()
+    assert started["match"]["status"] == "running"
+
+
 def test_protected_route_rejects_without_auth():
     with pytest.raises(HTTPException) as exc_info:
         routes.require_authenticated_user(build_request_with_cookies())

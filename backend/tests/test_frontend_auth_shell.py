@@ -1,5 +1,7 @@
 from http.cookies import SimpleCookie
+import io
 from pathlib import Path
+import zipfile
 
 import pytest
 from fastapi import HTTPException, Response
@@ -9,6 +11,7 @@ from app.api import routes
 from app.auth.config import AuthSettings
 from app.auth.service import AuthService
 from app.auth.store import AuthStore
+from app.main import create_app
 from app.services.match_service import MatchService
 from app.storage.hand_store import HandStore
 
@@ -56,11 +59,54 @@ def build_request_with_cookies(cookies: dict[str, str] | None = None) -> Request
     return Request(scope)
 
 
+def build_page_request(path: str, cookies: dict[str, str] | None = None) -> Request:
+    headers: list[tuple[bytes, bytes]] = [(b"host", b"localhost")]
+    if cookies:
+        cookie_header = "; ".join(f"{k}={v}" for k, v in cookies.items())
+        headers.append((b"cookie", cookie_header.encode("utf-8")))
+    scope = {
+        "type": "http",
+        "asgi.version": "3.0",
+        "scheme": "http",
+        "method": "GET",
+        "path": path,
+        "raw_path": path.encode("utf-8"),
+        "query_string": b"",
+        "headers": headers,
+    }
+    return Request(scope)
+
+
 def extract_session_cookie(response: Response) -> str:
     cookie = SimpleCookie()
     cookie.load(response.headers["set-cookie"])
     morsel = cookie[routes.auth_settings.session_cookie_name]
     return morsel.value
+
+
+def build_zip(files: dict[str, str]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    return buffer.getvalue()
+
+
+class FakeUploadFile:
+    def __init__(self, filename: str, payload: bytes):
+        self.filename = filename
+        self._payload = payload
+
+    async def read(self) -> bytes:
+        return self._payload
+
+
+def get_page_endpoint(path: str):
+    app = create_app()
+    for route in app.routes:
+        if getattr(route, "path", None) == path and "GET" in getattr(route, "methods", set()):
+            return route.endpoint
+    raise AssertionError(f"Missing GET route for {path}")
 
 
 def test_frontend_pages_split_login_lobby_and_my_bots():
@@ -186,3 +232,60 @@ def test_frontend_lobby_script_smoke_for_seat_select_and_inline_create():
     assert 'window.AppShell.request(`/tables/default/seats/${activeSeatId}/bot-select`' in lobby_js
     assert 'window.AppShell.request("/my/bots", {' in lobby_js
     assert "New bot created and seated successfully." in lobby_js
+
+
+def test_frontend_login_redirect_for_protected_pages():
+    lobby_endpoint = get_page_endpoint("/lobby")
+    my_bots_endpoint = get_page_endpoint("/my-bots")
+
+    lobby = lobby_endpoint(build_page_request(path="/lobby"))
+    assert lobby.status_code == 302
+    assert lobby.headers["location"] == "/login"
+
+    my_bots = my_bots_endpoint(build_page_request(path="/my-bots"))
+    assert my_bots.status_code == 302
+    assert my_bots.headers["location"] == "/login"
+
+
+def test_frontend_my_bots_page_loads_for_authenticated_user():
+    login_response = Response()
+    routes.login(
+        routes.LoginRequest(username="alice", password="correct-horse-battery-staple"),
+        login_response,
+        build_request_with_cookies(),
+    )
+    session_id = extract_session_cookie(login_response)
+    page_request = build_page_request(
+        path="/my-bots",
+        cookies={routes.auth_settings.session_cookie_name: session_id},
+    )
+    page = get_page_endpoint("/my-bots")(page_request)
+    assert page.status_code == 200
+    body = page.body.decode("utf-8")
+    assert 'id="my-bots-list"' in body
+    assert 'id="my-bots-upload-form"' in body
+
+
+@pytest.mark.anyio
+async def test_frontend_happy_path_upload_interaction():
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+"""
+        }
+    )
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    upload = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=FakeUploadFile(filename="smoke.zip", payload=payload),
+        name="Smoke Bot",
+        version="1.0.0",
+    )
+    assert upload["bot"]["name"] == "Smoke Bot"
+
+    listed = routes.list_my_bots(current_user=current_user)
+    assert len(listed["bots"]) == 1
+    assert listed["bots"][0]["bot_id"] == upload["bot"]["bot_id"]

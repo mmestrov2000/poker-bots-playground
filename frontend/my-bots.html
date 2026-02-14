@@ -27,8 +27,29 @@
           <h2>My Bots</h2>
           <p>Manage your uploaded bots for table seating.</p>
         </header>
-        <div id="my-bots-state" class="my-bots-state">Loading bots...</div>
-        <ul id="my-bots-list" class="my-bots-list hidden"></ul>
+
+        <section class="my-bots-upload" aria-labelledby="my-bots-upload-title">
+          <h3 id="my-bots-upload-title">Upload New Bot</h3>
+          <form id="my-bots-upload-form" class="my-bots-upload-form">
+            <label class="field-label" for="bot-name">Bot Name</label>
+            <input id="bot-name" name="name" type="text" maxlength="120" required />
+
+            <label class="field-label" for="bot-version">Version</label>
+            <input id="bot-version" name="version" type="text" maxlength="64" required />
+
+            <label class="field-label" for="bot-file">Bot Package (.zip)</label>
+            <input id="bot-file" name="bot_file" type="file" accept=".zip" required />
+
+            <button id="my-bots-upload-submit" type="submit">Upload Bot</button>
+          </form>
+          <p id="my-bots-upload-feedback" class="my-bots-upload-feedback hidden" role="status"></p>
+        </section>
+
+        <section class="my-bots-catalog" aria-labelledby="my-bots-catalog-title">
+          <h3 id="my-bots-catalog-title">Catalog</h3>
+          <p id="my-bots-state" class="my-bots-state" role="status">Loading bots...</p>
+          <ul id="my-bots-list" class="my-bots-list hidden"></ul>
+        </section>
       </section>
     </main>
 

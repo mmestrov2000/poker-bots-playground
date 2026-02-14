@@ -173,7 +173,7 @@ Goal: add authenticated user flow and owned bot management UX.
   - Enforce ownership checks on bot listing and selection.
   - Acceptance: User sees only owned bots with stable metadata and upload validation feedback.
   - Test Strategy: Integration tests for list/upload authorization and invalid payloads.
-- [ ] `M4-T5` Build My Bots frontend page with bot cards and upload flow (owner: `feature-agent`)
+- [x] `M4-T5` Build My Bots frontend page with bot cards and upload flow (owner: `feature-agent`)
   - Subtasks:
   - Add list UI with bot container cards and required fields (`bot_id`, name, timestamps/status).
   - Add upload interaction and result states.

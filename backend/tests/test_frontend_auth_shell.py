@@ -87,6 +87,13 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'id="start-match"' in lobby_html
 
     assert 'id="my-bots-list"' in my_bots_html
+    assert 'id="my-bots-upload-form"' in my_bots_html
+    assert 'id="bot-name"' in my_bots_html
+    assert 'id="bot-version"' in my_bots_html
+    assert 'id="bot-file"' in my_bots_html
+    assert 'id="my-bots-upload-submit"' in my_bots_html
+    assert 'id="my-bots-upload-feedback"' in my_bots_html
+    assert 'id="my-bots-state"' in my_bots_html
     assert "/static/my-bots.js" in my_bots_html
 
 
@@ -142,3 +149,25 @@ def test_frontend_register_smoke_and_duplicate_username_guard():
             build_request_with_cookies(),
         )
     assert duplicate_error.value.status_code == 409
+
+
+def test_frontend_my_bots_script_smoke_for_page_load_upload_and_states():
+    frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+    my_bots_js = (frontend_dir / "my-bots.js").read_text(encoding="utf-8")
+
+    # Authenticated page bootstrap and data load.
+    assert "window.AppShell.getCurrentUser()" in my_bots_js
+    assert 'window.AppShell.initHeader("my-bots", user)' in my_bots_js
+    assert 'window.AppShell.request("/my/bots")' in my_bots_js
+
+    # Upload success flow and post-upload reconciliation.
+    assert 'window.AppShell.request("/my/bots", {' in my_bots_js
+    assert 'method: "POST"' in my_bots_js
+    assert "Upload successful" in my_bots_js
+    assert "await loadBots()" in my_bots_js
+
+    # Error handling and explicit loading/empty/error states.
+    assert "Loading bots..." in my_bots_js
+    assert "No bots uploaded yet." in my_bots_js
+    assert "Failed to load bots." in my_bots_js
+    assert "Upload failed." in my_bots_js

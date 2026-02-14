@@ -152,14 +152,14 @@ Goal: add authenticated user flow and owned bot management UX.
   - Lock bot isolation intent for bot-managed persistence. Done.
   - Acceptance: Auth decisions are explicit and unambiguous for implementation.
   - Test Strategy: Doc review checklist and architecture/spec consistency pass.
-- [ ] `M4-T2` Implement backend auth endpoints and protected-route dependency (owner: `feature-agent`)
+- [x] `M4-T2` Implement backend auth endpoints and protected-route dependency (owner: `feature-agent`)
   - Subtasks:
   - Add `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`.
   - Add persistent user storage and password/session handling.
   - Enforce auth dependency on My Bots, Lobby, and seat-selection endpoints.
   - Acceptance: Unauthenticated requests to protected endpoints are rejected; login session enables access.
   - Test Strategy: Backend integration tests for login, auth guard, and logout invalidation.
-- [ ] `M4-T3` Implement frontend login page, protected app shell, and header menu (owner: `feature-agent`)
+- [x] `M4-T3` Implement frontend login page, protected app shell, and header menu (owner: `feature-agent`)
   - Subtasks:
   - Add login UI with validation and error handling.
   - Add shared authenticated header with `Lobby`, `My Bots`, and `Logout`.

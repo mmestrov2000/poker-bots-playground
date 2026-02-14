@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login | Poker Bots Playground</title>
+    <link rel="stylesheet" href="/static/styles.css?v=__ASSET_VERSION__" />
+  </head>
+  <body>
+    <main id="login-page" class="auth-layout" aria-live="polite">
+      <section class="auth-card">
+        <h1>Poker Bots Playground</h1>
+        <p id="auth-subtitle" class="auth-subtitle">Sign in to access Lobby and My Bots.</p>
+        <div class="auth-mode-switch" role="group" aria-label="Authentication mode">
+          <button id="auth-mode-login" type="button" class="auth-mode-button active">Login</button>
+          <button id="auth-mode-register" type="button" class="auth-mode-button">Register</button>
+        </div>
+        <form id="auth-form" novalidate>
+          <label class="field-label" for="auth-username">Username</label>
+          <input id="auth-username" name="username" type="text" autocomplete="username" maxlength="64" required />
+          <p id="auth-username-error" class="field-error hidden"></p>
+
+          <label class="field-label" for="auth-password">Password</label>
+          <input
+            id="auth-password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            maxlength="1024"
+            required
+          />
+          <p id="auth-password-error" class="field-error hidden"></p>
+
+          <p id="auth-form-success" class="form-success hidden"></p>
+          <p id="auth-form-error" class="form-error hidden"></p>
+          <button id="auth-submit" type="submit">Login</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="/static/login.js?v=__ASSET_VERSION__" defer></script>
+  </body>
+</html>

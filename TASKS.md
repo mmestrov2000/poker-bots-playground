@@ -194,7 +194,7 @@ Goal: add authenticated user flow and owned bot management UX.
   - Add minimal frontend flow test coverage for login + My Bots.
   - Acceptance: New tests fail on auth/ownership regressions and pass on compliant behavior.
   - Test Strategy: Run backend `pytest` and selected frontend smoke tests in CI.
-- [ ] `M4-T8` Review Milestone 4 changes for security and regression risk (owner: `review-agent`)
+- [x] `M4-T8` Review Milestone 4 changes for security and regression risk (owner: `review-agent`)
   - Subtasks:
   - Verify auth guard coverage and session invalidation behavior.
   - Verify ownership enforcement for all bot read/write/select paths.

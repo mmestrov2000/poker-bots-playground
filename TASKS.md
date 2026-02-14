@@ -166,7 +166,7 @@ Goal: add authenticated user flow and owned bot management UX.
   - Add route guard/redirect behavior for protected pages.
   - Acceptance: Protected pages are accessible only after login, with visible header navigation.
   - Test Strategy: Frontend smoke tests for redirect/login/logout/navigation flows.
-- [ ] `M4-T4` Implement backend My Bots catalog APIs and artifact metadata storage (owner: `feature-agent`)
+- [x] `M4-T4` Implement backend My Bots catalog APIs and artifact metadata storage (owner: `feature-agent`)
   - Subtasks:
   - Add `GET /api/v1/my/bots` and `POST /api/v1/my/bots`.
   - Persist bot ownership, metadata (`bot_id`, name, version, created_at), and artifact path.

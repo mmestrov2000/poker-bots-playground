@@ -394,6 +394,119 @@ def test_auth_login_success_and_me_returns_user():
     assert me_response["user"]["username"] == "alice"
 
 
+@pytest.mark.anyio
+async def test_my_bots_upload_and_list_success_for_authenticated_user():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+""",
+        }
+    )
+
+    created = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("alpha.zip", payload),
+        name="Alpha",
+        version="1.2.3",
+    )
+
+    bot = created["bot"]
+    assert bot["bot_id"]
+    assert bot["owner_user_id"] == current_user["user_id"]
+    assert bot["name"] == "Alpha"
+    assert bot["version"] == "1.2.3"
+    assert bot["status"] == "ready"
+    assert "artifact_path" not in bot
+
+    listed = routes.list_my_bots(current_user=current_user)
+    assert len(listed["bots"]) == 1
+    assert listed["bots"][0]["bot_id"] == bot["bot_id"]
+
+
+def test_my_bots_endpoints_reject_unauthenticated_access():
+    with pytest.raises(HTTPException) as exc_info:
+        routes.require_authenticated_user(build_request_with_cookies())
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Authentication required"
+
+
+@pytest.mark.anyio
+async def test_my_bots_ownership_isolated_between_users():
+    alice = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    bob = routes.auth_service.ensure_user("bob", "correct-horse-battery-staple")
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+""",
+        }
+    )
+
+    alice_bot = await routes.upload_my_bot(
+        current_user=alice,
+        bot_file=build_upload_file("alice.zip", payload),
+        name="Alice Bot",
+        version="1.0.0",
+    )
+    bob_bot = await routes.upload_my_bot(
+        current_user=bob,
+        bot_file=build_upload_file("bob.zip", payload),
+        name="Bob Bot",
+        version="2.0.0",
+    )
+
+    alice_list = routes.list_my_bots(current_user=alice)["bots"]
+    bob_list = routes.list_my_bots(current_user=bob)["bots"]
+    assert [bot["bot_id"] for bot in alice_list] == [alice_bot["bot"]["bot_id"]]
+    assert [bot["bot_id"] for bot in bob_list] == [bob_bot["bot"]["bot_id"]]
+
+    with pytest.raises(HTTPException) as forbidden:
+        routes.require_owned_bot(bob_bot["bot"]["bot_id"], current_user=alice)
+    assert forbidden.value.status_code == 403
+    assert forbidden.value.detail == "Forbidden"
+
+
+@pytest.mark.anyio
+async def test_my_bots_upload_rejects_invalid_payload():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+
+    with pytest.raises(HTTPException) as non_zip:
+        await routes.upload_my_bot(
+            current_user=current_user,
+            bot_file=build_upload_file("bad.txt", b"not-zip"),
+            name="Bad",
+            version="1.0.0",
+        )
+    assert non_zip.value.status_code == 400
+    assert non_zip.value.detail == "Only .zip bot uploads are supported"
+
+    with pytest.raises(HTTPException) as empty_name:
+        await routes.upload_my_bot(
+            current_user=current_user,
+            bot_file=build_upload_file("bot.zip", build_zip({"bot.py": "class PokerBot: pass"})),
+            name="   ",
+            version="1.0.0",
+        )
+    assert empty_name.value.status_code == 400
+    assert empty_name.value.detail == "name is required"
+
+    with pytest.raises(HTTPException) as invalid_archive:
+        await routes.upload_my_bot(
+            current_user=current_user,
+            bot_file=build_upload_file("bot.zip", b"not-a-real-zip"),
+            name="Broken Bot",
+            version="1.0.0",
+        )
+    assert invalid_archive.value.status_code == 400
+    assert invalid_archive.value.detail == "Upload is not a valid zip archive"
+
+
 def test_auth_register_success_sets_session_and_me_returns_user():
     response = Response()
     payload = routes.RegisterRequest(username="new-player", password="new-password")

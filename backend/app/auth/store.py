@@ -68,6 +68,17 @@ class AuthStore:
                     last_failed_at INTEGER NOT NULL,
                     locked_until INTEGER
                 );
+                CREATE TABLE IF NOT EXISTS bot_records (
+                    bot_id TEXT PRIMARY KEY,
+                    owner_user_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    artifact_path TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    FOREIGN KEY(owner_user_id) REFERENCES users(user_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_bot_records_owner_user_id
+                    ON bot_records(owner_user_id, created_at DESC);
                 """
             )
 
@@ -220,3 +231,56 @@ class AuthStore:
             if locked_until is None or locked_until <= now_ts:
                 return None
             return int(locked_until)
+
+    def create_bot_record(
+        self,
+        *,
+        bot_id: str,
+        owner_user_id: str,
+        name: str,
+        version: str,
+        artifact_path: str,
+        now_ts: int,
+    ) -> dict:
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO bot_records (bot_id, owner_user_id, name, version, artifact_path, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (bot_id, owner_user_id, name, version, artifact_path, now_ts),
+            )
+            connection.commit()
+        return {
+            "bot_id": bot_id,
+            "owner_user_id": owner_user_id,
+            "name": name,
+            "version": version,
+            "artifact_path": artifact_path,
+            "created_at": now_ts,
+        }
+
+    def list_bot_records_by_owner(self, owner_user_id: str) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT bot_id, owner_user_id, name, version, artifact_path, created_at
+                FROM bot_records
+                WHERE owner_user_id = ?
+                ORDER BY created_at DESC, bot_id DESC
+                """,
+                (owner_user_id,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_bot_record(self, bot_id: str) -> dict | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT bot_id, owner_user_id, name, version, artifact_path, created_at
+                FROM bot_records
+                WHERE bot_id = ?
+                """,
+                (bot_id,),
+            ).fetchone()
+            return dict(row) if row is not None else None

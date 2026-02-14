@@ -31,6 +31,11 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
+class RegisterRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=1024)
+
+
 def require_authenticated_user(request: Request) -> dict:
     session_id = request.cookies.get(auth_settings.session_cookie_name)
     user = auth_service.get_user_from_session(session_id)
@@ -58,6 +63,25 @@ def login(payload: LoginRequest, response: Response) -> dict:
         ) from exc
     except AuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+    response.set_cookie(
+        key=auth_settings.session_cookie_name,
+        value=session["session_id"],
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=auth_settings.session_ttl_seconds,
+        path="/",
+    )
+    return {"user": user}
+
+
+@router.post("/auth/register")
+def register(payload: RegisterRequest, response: Response) -> dict:
+    try:
+        user, session = auth_service.register(username=payload.username, password=payload.password)
+    except AuthError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     response.set_cookie(
         key=auth_settings.session_cookie_name,

@@ -24,6 +24,7 @@ let seatNames = {};
 let pnlVisibility = {};
 let authUser = null;
 let authPending = false;
+let authMode = "login";
 let lobbyRefreshTimer = null;
 let myBotsLoading = false;
 
@@ -38,6 +39,9 @@ const loginSubmit = document.getElementById("login-submit");
 const loginUsernameError = document.getElementById("login-username-error");
 const loginPasswordError = document.getElementById("login-password-error");
 const loginFormError = document.getElementById("login-form-error");
+const authSubtitle = document.getElementById("auth-subtitle");
+const authModeLoginButton = document.getElementById("auth-mode-login");
+const authModeRegisterButton = document.getElementById("auth-mode-register");
 
 const lobbyPage = document.getElementById("page-lobby");
 const myBotsPage = document.getElementById("page-my-bots");
@@ -101,7 +105,13 @@ function setLoginBusy(isBusy) {
   authPending = isBusy;
   if (loginSubmit) {
     loginSubmit.disabled = isBusy;
-    loginSubmit.textContent = isBusy ? "Logging in..." : "Login";
+    loginSubmit.textContent = isBusy
+      ? authMode === "register"
+        ? "Creating account..."
+        : "Logging in..."
+      : authMode === "register"
+        ? "Create account"
+        : "Login";
   }
 }
 
@@ -132,6 +142,20 @@ function validateLoginForm() {
   }
 
   return { valid, username, password };
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  authModeLoginButton?.classList.toggle("active", mode === "login");
+  authModeRegisterButton?.classList.toggle("active", mode === "register");
+  if (authSubtitle) {
+    authSubtitle.textContent =
+      mode === "register"
+        ? "Create an account to access Lobby and My Bots."
+        : "Sign in to access Lobby and My Bots.";
+  }
+  resetLoginErrors();
+  setLoginBusy(false);
 }
 
 function showLoginPage() {
@@ -730,6 +754,16 @@ async function loginWithCredentials(username, password) {
   return response.user;
 }
 
+async function registerWithCredentials(username, password) {
+  const response = await request("/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  authUser = response.user;
+  return response.user;
+}
+
 async function handleLoginSubmit(event) {
   event.preventDefault();
   if (authPending) {
@@ -743,7 +777,11 @@ async function handleLoginSubmit(event) {
 
   setLoginBusy(true);
   try {
-    await loginWithCredentials(username, password);
+    if (authMode === "register") {
+      await registerWithCredentials(username, password);
+    } else {
+      await loginWithCredentials(username, password);
+    }
     resetLoginErrors();
     loginPassword.value = "";
     setRoute(ROUTES.lobby, { replace: true });
@@ -751,6 +789,8 @@ async function handleLoginSubmit(event) {
   } catch (error) {
     if (error.statusCode === 401) {
       setTextError(loginFormError, "Invalid username or password.");
+    } else if (error.statusCode === 409) {
+      setTextError(loginFormError, "Username is already taken.");
     } else if (error.statusCode === 429) {
       const retry = Number(error.detail?.retry_after_seconds);
       const detail = Number.isFinite(retry)
@@ -820,6 +860,9 @@ async function renderRoute() {
 }
 
 function wireEvents() {
+  authModeLoginButton?.addEventListener("click", () => setAuthMode("login"));
+  authModeRegisterButton?.addEventListener("click", () => setAuthMode("register"));
+
   loginForm?.addEventListener("submit", (event) => {
     handleLoginSubmit(event).catch((error) => {
       setTextError(loginFormError, error.message || "Login failed.");
@@ -904,6 +947,7 @@ function wireEvents() {
 
 async function bootstrap() {
   wireEvents();
+  setAuthMode("login");
   setHandDetailMode("logs");
   resetPnlState();
   await fetchAuthenticatedUser();

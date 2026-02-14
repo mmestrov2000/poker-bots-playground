@@ -53,6 +53,25 @@ class AuthService:
         )
         return self._public_user(user)
 
+    def register(self, username: str, password: str) -> tuple[dict, dict]:
+        normalized_username = self._normalize_username(username)
+        if self.store.get_user_by_username(normalized_username) is not None:
+            raise AuthError("Username is already taken")
+
+        password_hash = self.password_hasher.hash_password(password)
+        user = self.store.create_user(
+            username=normalized_username,
+            password_hash=password_hash,
+            now_ts=self._now(),
+        )
+        self.store.clear_failures(normalized_username)
+        session = self.store.create_session(
+            user_id=user["user_id"],
+            now_ts=self._now(),
+            ttl_seconds=self.settings.session_ttl_seconds,
+        )
+        return self._public_user(user), session
+
     def login(self, username: str, password: str) -> tuple[dict, dict]:
         now_ts = self._now()
         normalized_username = self._normalize_username(username)

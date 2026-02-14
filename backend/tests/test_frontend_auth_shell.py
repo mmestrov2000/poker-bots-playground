@@ -66,6 +66,8 @@ def test_frontend_shell_has_login_auth_header_and_lobby_routes():
     html = frontend_index.read_text(encoding="utf-8")
 
     assert 'id="login-form"' in html
+    assert 'id="auth-mode-login"' in html
+    assert 'id="auth-mode-register"' in html
     assert 'id="nav-lobby"' in html
     assert 'id="nav-my-bots"' in html
     assert 'id="logout-button"' in html
@@ -109,3 +111,23 @@ def test_frontend_route_guard_login_logout_navigation_smoke():
     with pytest.raises(HTTPException) as unauthorized_after_logout:
         routes.require_authenticated_user(request)
     assert unauthorized_after_logout.value.status_code == 401
+
+
+def test_frontend_register_smoke_and_duplicate_username_guard():
+    register_response = Response()
+    register_result = routes.register(
+        routes.RegisterRequest(username="new-player", password="new-password"),
+        register_response,
+    )
+    assert register_result["user"]["username"] == "new-player"
+    session_id = extract_session_cookie(register_response)
+    request = build_request_with_cookies({routes.auth_settings.session_cookie_name: session_id})
+    current_user = routes.require_authenticated_user(request)
+    assert current_user["username"] == "new-player"
+
+    with pytest.raises(HTTPException) as duplicate_error:
+        routes.register(
+            routes.RegisterRequest(username="new-player", password="different-password"),
+            Response(),
+        )
+    assert duplicate_error.value.status_code == 409

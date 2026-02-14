@@ -377,6 +377,29 @@ def test_auth_login_success_and_me_returns_user():
     assert me_response["user"]["username"] == "alice"
 
 
+def test_auth_register_success_sets_session_and_me_returns_user():
+    response = Response()
+    payload = routes.RegisterRequest(username="new-player", password="new-password")
+    register_result = routes.register(payload, response)
+    assert register_result["user"]["username"] == "new-player"
+    session_id = extract_session_cookie(response)
+    assert session_id
+
+    request = build_request_with_cookies({routes.auth_settings.session_cookie_name: session_id})
+    me_response = routes.me(current_user=routes.require_authenticated_user(request))
+    assert me_response["user"]["username"] == "new-player"
+
+
+def test_auth_register_duplicate_username_returns_409():
+    with pytest.raises(HTTPException) as exc_info:
+        routes.register(
+            routes.RegisterRequest(username="alice", password="anything"),
+            Response(),
+        )
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "Username is already taken"
+
+
 def test_auth_login_failure_returns_401():
     with pytest.raises(HTTPException) as exc_info:
         routes.login(

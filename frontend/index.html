@@ -10,7 +10,11 @@
     <main id="login-page" class="auth-layout hidden" aria-live="polite">
       <section class="auth-card">
         <h1>Poker Bots Playground</h1>
-        <p class="auth-subtitle">Sign in to access Lobby and My Bots.</p>
+        <p id="auth-subtitle" class="auth-subtitle">Sign in to access Lobby and My Bots.</p>
+        <div class="auth-mode-switch" role="group" aria-label="Authentication mode">
+          <button id="auth-mode-login" type="button" class="auth-mode-button active">Login</button>
+          <button id="auth-mode-register" type="button" class="auth-mode-button">Register</button>
+        </div>
         <form id="login-form" novalidate>
           <label class="field-label" for="login-username">Username</label>
           <input id="login-username" name="username" type="text" autocomplete="username" maxlength="64" required />

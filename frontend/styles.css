@@ -82,6 +82,23 @@ button:disabled {
   color: var(--muted);
 }
 
+.auth-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.auth-mode-button {
+  background: #fff;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.auth-mode-button.active {
+  background: rgba(31, 106, 79, 0.12);
+  border-color: rgba(31, 106, 79, 0.4);
+}
+
 .field-label {
   font-weight: 600;
   font-size: 0.92rem;

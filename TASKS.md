@@ -159,7 +159,7 @@ Goal: add authenticated user flow and owned bot management UX.
   - Enforce auth dependency on My Bots, Lobby, and seat-selection endpoints.
   - Acceptance: Unauthenticated requests to protected endpoints are rejected; login session enables access.
   - Test Strategy: Backend integration tests for login, auth guard, and logout invalidation.
-- [ ] `M4-T3` Implement frontend login page, protected app shell, and header menu (owner: `feature-agent`)
+- [x] `M4-T3` Implement frontend login page, protected app shell, and header menu (owner: `feature-agent`)
   - Subtasks:
   - Add login UI with validation and error handling.
   - Add shared authenticated header with `Lobby`, `My Bots`, and `Logout`.

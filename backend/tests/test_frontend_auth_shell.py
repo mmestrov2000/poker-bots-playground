@@ -1,0 +1,111 @@
+from http.cookies import SimpleCookie
+from pathlib import Path
+
+import pytest
+from fastapi import HTTPException, Response
+from starlette.requests import Request
+
+from app.api import routes
+from app.auth.config import AuthSettings
+from app.auth.service import AuthService
+from app.auth.store import AuthStore
+from app.services.match_service import MatchService
+from app.storage.hand_store import HandStore
+
+
+@pytest.fixture(autouse=True)
+def isolate_route_state(tmp_path, monkeypatch):
+    uploads_dir = tmp_path / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+
+    settings = AuthSettings(
+        session_cookie_name="ppg_session",
+        session_ttl_seconds=3600,
+        login_max_failures=3,
+        login_lockout_seconds=60,
+        login_failure_window_seconds=300,
+        bootstrap_username="bootstrap",
+        bootstrap_password="bootstrap-password",
+        db_path=Path(tmp_path / "auth.sqlite3"),
+    )
+    auth_service = AuthService(store=AuthStore(settings.db_path), settings=settings)
+    auth_service.ensure_user("alice", "correct-horse-battery-staple")
+
+    monkeypatch.setattr(routes, "uploads_dir", uploads_dir)
+    monkeypatch.setattr(routes, "match_service", MatchService(hand_store=HandStore(base_dir=tmp_path / "hands")))
+    monkeypatch.setattr(routes, "auth_settings", settings)
+    monkeypatch.setattr(routes, "auth_service", auth_service)
+
+
+def build_request_with_cookies(cookies: dict[str, str] | None = None) -> Request:
+    headers: list[tuple[bytes, bytes]] = []
+    if cookies:
+        cookie_header = "; ".join(f"{k}={v}" for k, v in cookies.items())
+        headers.append((b"cookie", cookie_header.encode("utf-8")))
+    scope = {
+        "type": "http",
+        "asgi.version": "3.0",
+        "method": "GET",
+        "path": "/",
+        "raw_path": b"/",
+        "query_string": b"",
+        "headers": headers,
+    }
+    return Request(scope)
+
+
+def extract_session_cookie(response: Response) -> str:
+    cookie = SimpleCookie()
+    cookie.load(response.headers["set-cookie"])
+    morsel = cookie[routes.auth_settings.session_cookie_name]
+    return morsel.value
+
+
+def test_frontend_shell_has_login_auth_header_and_lobby_routes():
+    frontend_index = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
+    html = frontend_index.read_text(encoding="utf-8")
+
+    assert 'id="login-form"' in html
+    assert 'id="nav-lobby"' in html
+    assert 'id="nav-my-bots"' in html
+    assert 'id="logout-button"' in html
+    assert 'href="#/lobby"' in html
+    assert 'href="#/my-bots"' in html
+    assert 'id="page-lobby"' in html
+    assert 'id="page-my-bots"' in html
+
+    # Existing table UX controls remain available under Lobby.
+    assert 'id="seat-1-take"' in html
+    assert 'id="seat-6-take"' in html
+    assert 'id="start-match"' in html
+
+
+def test_frontend_route_guard_login_logout_navigation_smoke():
+    with pytest.raises(HTTPException) as unauthorized:
+        routes.require_authenticated_user(build_request_with_cookies())
+    assert unauthorized.value.status_code == 401
+
+    login_response = Response()
+    login_result = routes.login(
+        routes.LoginRequest(username="alice", password="correct-horse-battery-staple"),
+        login_response,
+    )
+    assert login_result["user"]["username"] == "alice"
+    session_id = extract_session_cookie(login_response)
+
+    request = build_request_with_cookies({routes.auth_settings.session_cookie_name: session_id})
+    current_user = routes.require_authenticated_user(request)
+    assert current_user["username"] == "alice"
+
+    lobby = routes.list_lobby_tables(current_user=current_user)
+    my_bots = routes.list_my_bots(current_user=current_user)
+    assert lobby["user"]["username"] == "alice"
+    assert my_bots["user"]["username"] == "alice"
+
+    logout_response = Response()
+    logout_result = routes.logout(request, logout_response)
+    assert logout_result["ok"] is True
+
+    with pytest.raises(HTTPException) as unauthorized_after_logout:
+        routes.require_authenticated_user(request)
+    assert unauthorized_after_logout.value.status_code == 401

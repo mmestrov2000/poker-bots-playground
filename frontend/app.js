@@ -1,4 +1,10 @@
 const apiBase = "/api/v1";
+const ROUTES = {
+  login: "/login",
+  lobby: "/lobby",
+  myBots: "/my-bots",
+};
+const protectedRoutes = new Set([ROUTES.lobby, ROUTES.myBots]);
 const handDetailPlaceholder = "Select a hand to view full history.";
 const seatIds = ["1", "2", "3", "4", "5", "6"];
 let selectedHandId = null;
@@ -16,6 +22,29 @@ let pnlPoints = {};
 let pnlRefreshing = false;
 let seatNames = {};
 let pnlVisibility = {};
+let authUser = null;
+let authPending = false;
+let lobbyRefreshTimer = null;
+let myBotsLoading = false;
+
+const loginPage = document.getElementById("login-page");
+const appShell = document.getElementById("app-shell");
+const authUserLabel = document.getElementById("auth-user");
+
+const loginForm = document.getElementById("login-form");
+const loginUsername = document.getElementById("login-username");
+const loginPassword = document.getElementById("login-password");
+const loginSubmit = document.getElementById("login-submit");
+const loginUsernameError = document.getElementById("login-username-error");
+const loginPasswordError = document.getElementById("login-password-error");
+const loginFormError = document.getElementById("login-form-error");
+
+const lobbyPage = document.getElementById("page-lobby");
+const myBotsPage = document.getElementById("page-my-bots");
+const myBotsState = document.getElementById("my-bots-state");
+const myBotsList = document.getElementById("my-bots-list");
+const navLobby = document.getElementById("nav-lobby");
+const navMyBots = document.getElementById("nav-my-bots");
 
 const handDetailTabs = {
   logs: document.getElementById("hand-detail-logs"),
@@ -32,13 +61,156 @@ const pnlElements = {
 };
 const leaderboardList = document.getElementById("leaderboard-list");
 
+function normalizeHashRoute() {
+  const raw = window.location.hash.replace(/^#/, "").trim();
+  if (!raw) {
+    return null;
+  }
+  return raw.startsWith("/") ? raw : `/${raw}`;
+}
+
+function setRoute(route, { replace = false } = {}) {
+  const targetHash = `#${route}`;
+  if (replace) {
+    window.history.replaceState(null, "", targetHash);
+    return;
+  }
+  if (window.location.hash !== targetHash) {
+    window.location.hash = targetHash;
+  }
+}
+
+function getCurrentRoute() {
+  return normalizeHashRoute() || ROUTES.lobby;
+}
+
+function setTextError(element, message) {
+  if (!element) {
+    return;
+  }
+  if (message) {
+    element.textContent = message;
+    element.classList.remove("hidden");
+    return;
+  }
+  element.textContent = "";
+  element.classList.add("hidden");
+}
+
+function setLoginBusy(isBusy) {
+  authPending = isBusy;
+  if (loginSubmit) {
+    loginSubmit.disabled = isBusy;
+    loginSubmit.textContent = isBusy ? "Logging in..." : "Login";
+  }
+}
+
+function resetLoginErrors() {
+  setTextError(loginUsernameError, "");
+  setTextError(loginPasswordError, "");
+  setTextError(loginFormError, "");
+  loginUsername?.classList.remove("input-error");
+  loginPassword?.classList.remove("input-error");
+}
+
+function validateLoginForm() {
+  resetLoginErrors();
+  const username = loginUsername?.value.trim() || "";
+  const password = loginPassword?.value || "";
+  let valid = true;
+
+  if (!username) {
+    valid = false;
+    loginUsername?.classList.add("input-error");
+    setTextError(loginUsernameError, "Username is required.");
+  }
+
+  if (!password) {
+    valid = false;
+    loginPassword?.classList.add("input-error");
+    setTextError(loginPasswordError, "Password is required.");
+  }
+
+  return { valid, username, password };
+}
+
+function showLoginPage() {
+  loginPage?.classList.remove("hidden");
+  appShell?.classList.add("hidden");
+}
+
+function showAppShell() {
+  loginPage?.classList.add("hidden");
+  appShell?.classList.remove("hidden");
+}
+
+function setActiveNav(route) {
+  navLobby?.classList.toggle("active", route === ROUTES.lobby);
+  navMyBots?.classList.toggle("active", route === ROUTES.myBots);
+}
+
+function renderProtectedPage(route) {
+  showAppShell();
+  authUserLabel.textContent = authUser ? `Signed in as ${authUser.username}` : "";
+  setActiveNav(route);
+  lobbyPage.classList.toggle("hidden", route !== ROUTES.lobby);
+  myBotsPage.classList.toggle("hidden", route !== ROUTES.myBots);
+}
+
 async function request(path, options = {}) {
-  const response = await fetch(`${apiBase}${path}`, options);
+  const requestOptions = { ...options };
+  if (!requestOptions.credentials) {
+    requestOptions.credentials = "same-origin";
+  }
+  const response = await fetch(`${apiBase}${path}`, requestOptions);
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.detail || `Request failed: ${response.status}`);
+    const detail = payload.detail;
+    if (typeof detail === "string") {
+      const error = new Error(detail);
+      error.statusCode = response.status;
+      error.detail = detail;
+      throw error;
+    }
+    const message = detail?.message || payload.message || `Request failed: ${response.status}`;
+    const error = new Error(message);
+    error.statusCode = response.status;
+    error.detail = detail;
+    throw error;
   }
   return response.json();
+}
+
+async function fetchAuthenticatedUser() {
+  try {
+    const response = await request("/auth/me");
+    authUser = response.user;
+    return authUser;
+  } catch (error) {
+    if (error.statusCode === 401) {
+      authUser = null;
+      return null;
+    }
+    throw error;
+  }
+}
+
+function stopLobbyRefreshTimer() {
+  if (lobbyRefreshTimer !== null) {
+    window.clearInterval(lobbyRefreshTimer);
+    lobbyRefreshTimer = null;
+  }
+}
+
+function ensureLobbyRefreshTimer() {
+  if (lobbyRefreshTimer !== null) {
+    return;
+  }
+  lobbyRefreshTimer = window.setInterval(() => {
+    if (getCurrentRoute() === ROUTES.lobby && authUser) {
+      refreshState();
+    }
+  }, 2000);
 }
 
 function updateSeatStatus(seats) {
@@ -58,8 +230,12 @@ function updateSeatStatus(seats) {
 
     const seatButton = document.getElementById(`seat-${seatId}-take`);
     const seatInput = document.getElementById(`seat-${seatId}-file`);
-    seatButton.disabled = seatReady;
-    seatInput.disabled = seatReady;
+    if (seatButton) {
+      seatButton.disabled = seatReady;
+    }
+    if (seatInput) {
+      seatInput.disabled = seatReady;
+    }
 
     if (seatReady) {
       readyCount += 1;
@@ -71,6 +247,9 @@ function updateSeatStatus(seats) {
 
 function renderHandDetail() {
   const detail = document.getElementById("hand-detail");
+  if (!detail) {
+    return;
+  }
   detail.textContent = handDetailMode === "logs" ? handDetailText : "";
 }
 
@@ -272,7 +451,10 @@ async function refreshPnl() {
 
 function updateMatchStatus(match) {
   latestMatch = match;
-  document.getElementById("match-status").textContent = `Match: ${match.status}, hands played: ${match.hands_played}`;
+  const statusElement = document.getElementById("match-status");
+  if (statusElement) {
+    statusElement.textContent = `Match: ${match.status}, hands played: ${match.hands_played}`;
+  }
 }
 
 function updateMatchControls(match, seatsReady) {
@@ -280,6 +462,10 @@ function updateMatchControls(match, seatsReady) {
   const pauseButton = document.getElementById("pause-match");
   const resumeButton = document.getElementById("resume-match");
   const endButton = document.getElementById("end-match");
+
+  if (!startButton || !pauseButton || !resumeButton || !endButton) {
+    return;
+  }
 
   startButton.disabled = !(seatsReady && (match.status === "waiting" || match.status === "stopped"));
   pauseButton.disabled = match.status !== "running";
@@ -289,7 +475,7 @@ function updateMatchControls(match, seatsReady) {
 
 async function uploadSeat(seatId) {
   const input = document.getElementById(`seat-${seatId}-file`);
-  const file = input.files?.[0];
+  const file = input?.files?.[0];
   if (!file) {
     alert(`Select a .zip file for Seat ${seatId} first.`);
     return;
@@ -311,6 +497,9 @@ async function uploadSeat(seatId) {
 
 function renderHands(hands) {
   const list = document.getElementById("hands-list");
+  if (!list) {
+    return;
+  }
   list.innerHTML = "";
 
   if (!hands.length) {
@@ -335,15 +524,18 @@ function setHandHistoryVisibility(isVisible) {
   const body = document.getElementById("hands-body");
   const list = document.getElementById("hands-list");
   const controls = document.getElementById("hands-controls");
-  body.classList.toggle("hidden", !isVisible);
-  list.classList.toggle("hidden", !isVisible);
-  controls.classList.toggle("hidden", !isVisible);
+  body?.classList.toggle("hidden", !isVisible);
+  list?.classList.toggle("hidden", !isVisible);
+  controls?.classList.toggle("hidden", !isVisible);
 }
 
 function updateHandsPagination() {
   const info = document.getElementById("hands-page-info");
   const prev = document.getElementById("hands-prev");
   const next = document.getElementById("hands-next");
+  if (!info || !prev || !next) {
+    return;
+  }
   if (!handHistoryVisible) {
     info.textContent = "Page 1 of 1";
     prev.disabled = true;
@@ -384,7 +576,7 @@ async function showHandHistory() {
   snapshotMaxHandId = latestMatch.hands_played;
   handHistoryVisible = true;
   handsPage = 1;
-  handsPageSize = Number(document.getElementById("hands-page-size").value);
+  handsPageSize = Number(document.getElementById("hands-page-size")?.value || "100");
   setHandHistoryVisibility(true);
   await loadHandHistoryPage();
 }
@@ -409,12 +601,17 @@ function clearHandHistory() {
   handsTotalHands = 0;
   handsTotalPages = 0;
   const list = document.getElementById("hands-list");
-  list.innerHTML = "";
+  if (list) {
+    list.innerHTML = "";
+  }
   setHandHistoryVisibility(false);
   updateHandsPagination();
 }
 
 async function refreshState() {
+  if (!authUser || getCurrentRoute() !== ROUTES.lobby) {
+    return;
+  }
   try {
     const [seats, match, leaderboard] = await Promise.all([
       request("/seats"),
@@ -432,6 +629,13 @@ async function refreshState() {
     }
     await refreshPnl();
   } catch (error) {
+    if (error.statusCode === 401) {
+      authUser = null;
+      stopLobbyRefreshTimer();
+      setRoute(ROUTES.login, { replace: true });
+      await renderRoute();
+      return;
+    }
     console.error(error);
   }
 }
@@ -464,7 +668,165 @@ async function resetMatch() {
   await refreshState();
 }
 
+function renderMyBotsList(bots) {
+  myBotsList.innerHTML = "";
+  if (!bots.length) {
+    myBotsList.classList.add("hidden");
+    myBotsState.textContent = "No bots uploaded yet.";
+    myBotsState.classList.remove("hidden");
+    return;
+  }
+
+  bots.forEach((bot) => {
+    const item = document.createElement("li");
+    item.className = "my-bot-card";
+    item.innerHTML = `
+      <h3>${bot.name || "Unnamed Bot"}</h3>
+      <p><strong>ID:</strong> ${bot.bot_id || "-"}</p>
+      <p><strong>Version:</strong> ${bot.version || "-"}</p>
+      <p><strong>Status:</strong> ${bot.status || "-"}</p>
+      <p><strong>Created:</strong> ${bot.created_at || "-"}</p>
+    `;
+    myBotsList.appendChild(item);
+  });
+
+  myBotsState.classList.add("hidden");
+  myBotsList.classList.remove("hidden");
+}
+
+async function loadMyBots() {
+  if (myBotsLoading) {
+    return;
+  }
+  myBotsLoading = true;
+  myBotsState.textContent = "Loading bots...";
+  myBotsState.classList.remove("hidden");
+  myBotsList.classList.add("hidden");
+  try {
+    const response = await request("/my/bots");
+    renderMyBotsList(response.bots || []);
+  } catch (error) {
+    if (error.statusCode === 401) {
+      authUser = null;
+      setRoute(ROUTES.login, { replace: true });
+      await renderRoute();
+      return;
+    }
+    myBotsList.classList.add("hidden");
+    myBotsState.textContent = error.message || "Failed to load bots.";
+    myBotsState.classList.remove("hidden");
+  } finally {
+    myBotsLoading = false;
+  }
+}
+
+async function loginWithCredentials(username, password) {
+  const response = await request("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  authUser = response.user;
+  return response.user;
+}
+
+async function handleLoginSubmit(event) {
+  event.preventDefault();
+  if (authPending) {
+    return;
+  }
+
+  const { valid, username, password } = validateLoginForm();
+  if (!valid) {
+    return;
+  }
+
+  setLoginBusy(true);
+  try {
+    await loginWithCredentials(username, password);
+    resetLoginErrors();
+    loginPassword.value = "";
+    setRoute(ROUTES.lobby, { replace: true });
+    await renderRoute();
+  } catch (error) {
+    if (error.statusCode === 401) {
+      setTextError(loginFormError, "Invalid username or password.");
+    } else if (error.statusCode === 429) {
+      const retry = Number(error.detail?.retry_after_seconds);
+      const detail = Number.isFinite(retry)
+        ? `Too many attempts. Retry in ${retry} seconds.`
+        : "Too many attempts. Please retry later.";
+      setTextError(loginFormError, detail);
+    } else {
+      setTextError(loginFormError, error.message || "Login failed.");
+    }
+  } finally {
+    setLoginBusy(false);
+  }
+}
+
+async function logout() {
+  try {
+    await request("/auth/logout", { method: "POST" });
+  } catch (error) {
+    if (error.statusCode !== 401) {
+      console.error(error);
+    }
+  }
+  authUser = null;
+  stopLobbyRefreshTimer();
+  setRoute(ROUTES.login, { replace: true });
+  await renderRoute();
+}
+
+async function renderRoute() {
+  const route = getCurrentRoute();
+
+  if (route === ROUTES.login) {
+    stopLobbyRefreshTimer();
+    if (authUser) {
+      setRoute(ROUTES.lobby, { replace: true });
+      return renderRoute();
+    }
+    showLoginPage();
+    setActiveNav(route);
+    return;
+  }
+
+  if (protectedRoutes.has(route)) {
+    if (!authUser) {
+      stopLobbyRefreshTimer();
+      setRoute(ROUTES.login, { replace: true });
+      return renderRoute();
+    }
+
+    renderProtectedPage(route);
+    if (route === ROUTES.lobby) {
+      ensureLobbyRefreshTimer();
+      await refreshState();
+    } else {
+      stopLobbyRefreshTimer();
+      await loadMyBots();
+    }
+    return;
+  }
+
+  if (!authUser) {
+    setRoute(ROUTES.login, { replace: true });
+    return renderRoute();
+  }
+  setRoute(ROUTES.lobby, { replace: true });
+  return renderRoute();
+}
+
 function wireEvents() {
+  loginForm?.addEventListener("submit", (event) => {
+    handleLoginSubmit(event).catch((error) => {
+      setTextError(loginFormError, error.message || "Login failed.");
+      setLoginBusy(false);
+    });
+  });
+
   const logsTab = document.getElementById("hand-detail-logs");
   const replayTab = document.getElementById("hand-detail-replay");
 
@@ -480,13 +842,26 @@ function wireEvents() {
     );
   });
 
-  document.getElementById("start-match").addEventListener("click", () => startMatch().catch((error) => alert(error.message)));
-  document.getElementById("pause-match").addEventListener("click", () => pauseMatch().catch((error) => alert(error.message)));
-  document.getElementById("resume-match").addEventListener("click", () => resumeMatch().catch((error) => alert(error.message)));
-  document.getElementById("end-match").addEventListener("click", () => endMatch().catch((error) => alert(error.message)));
-  document.getElementById("reset-match").addEventListener("click", () => resetMatch().catch((error) => alert(error.message)));
-  document.getElementById("hand-history-button").addEventListener("click", () => showHandHistory().catch((error) => alert(error.message)));
-  document.getElementById("hands-page-size").addEventListener("change", (event) => {
+  document
+    .getElementById("start-match")
+    ?.addEventListener("click", () => startMatch().catch((error) => alert(error.message)));
+  document
+    .getElementById("pause-match")
+    ?.addEventListener("click", () => pauseMatch().catch((error) => alert(error.message)));
+  document
+    .getElementById("resume-match")
+    ?.addEventListener("click", () => resumeMatch().catch((error) => alert(error.message)));
+  document
+    .getElementById("end-match")
+    ?.addEventListener("click", () => endMatch().catch((error) => alert(error.message)));
+  document
+    .getElementById("reset-match")
+    ?.addEventListener("click", () => resetMatch().catch((error) => alert(error.message)));
+  document
+    .getElementById("hand-history-button")
+    ?.addEventListener("click", () => showHandHistory().catch((error) => alert(error.message)));
+
+  document.getElementById("hands-page-size")?.addEventListener("change", (event) => {
     handsPageSize = Number(event.target.value);
     handsPage = 1;
     if (handHistoryVisible) {
@@ -495,30 +870,53 @@ function wireEvents() {
       updateHandsPagination();
     }
   });
-  document.getElementById("hands-prev").addEventListener("click", () => {
+  document.getElementById("hands-prev")?.addEventListener("click", () => {
     if (handsPage > 1) {
       handsPage -= 1;
       loadHandHistoryPage().catch((error) => alert(error.message));
     }
   });
-  document.getElementById("hands-next").addEventListener("click", () => {
+  document.getElementById("hands-next")?.addEventListener("click", () => {
     if (handsPage < handsTotalPages) {
       handsPage += 1;
       loadHandHistoryPage().catch((error) => alert(error.message));
     }
   });
+
   if (logsTab) {
     logsTab.addEventListener("click", () => setHandDetailMode("logs"));
   }
   if (replayTab) {
     replayTab.addEventListener("click", () => setHandDetailMode("replay"));
   }
-  handsPageSize = Number(document.getElementById("hands-page-size").value);
+
+  document.getElementById("logout-button")?.addEventListener("click", () => {
+    logout().catch((error) => console.error(error));
+  });
+
+  window.addEventListener("hashchange", () => {
+    renderRoute().catch((error) => console.error(error));
+  });
+
+  handsPageSize = Number(document.getElementById("hands-page-size")?.value || "100");
   updateHandsPagination();
 }
 
-wireEvents();
-setHandDetailMode("logs");
-resetPnlState();
-refreshState();
-setInterval(refreshState, 2000);
+async function bootstrap() {
+  wireEvents();
+  setHandDetailMode("logs");
+  resetPnlState();
+  await fetchAuthenticatedUser();
+
+  if (normalizeHashRoute() === null) {
+    setRoute(authUser ? ROUTES.lobby : ROUTES.login, { replace: true });
+  }
+
+  await renderRoute();
+}
+
+bootstrap().catch((error) => {
+  console.error(error);
+  setTextError(loginFormError, "Failed to initialize application.");
+  showLoginPage();
+});

@@ -3,6 +3,7 @@ services:
     build: .
     environment:
       - APP_ASSET_VERSION=${APP_ASSET_VERSION:-dev}
+      - APP_RUNTIME_DIR=/app/runtime
       - APP_AUTH_DB_PATH=/app/runtime/auth.sqlite3
     ports:
       - "8000:8000"

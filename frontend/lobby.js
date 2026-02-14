@@ -402,6 +402,7 @@
     clearHandHistory();
     await refreshState();
     setSeatAssignmentFeedback(successMessage, "success");
+    closeSeatAssignmentPanel();
   }
 
   function setSeatAssignmentBusy(isBusy) {

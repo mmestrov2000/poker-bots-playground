@@ -108,3 +108,87 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 - Run with `docker-compose.yml` in development.
 - Expose app on `8000` and persist `runtime/` via volume mount.
 - VPS deployment can reuse the same image and environment variables.
+
+## Batch 2 Architecture Extension
+This section defines architectural additions for authentication, bot ownership, table lobby, leaderboard, and stronger runtime isolation.
+
+## Extended Components
+- `Auth Service`: login/logout/session handling and route protection.
+- `User Store`: persistent user identity records.
+- `Bot Registry Service`: per-user bot metadata and artifact lifecycle.
+- `Table Lobby Service`: create/list/open table management.
+- `Leaderboard Service`: persistent aggregate performance (`bb/hand`) per bot.
+- `Bot Runtime Supervisor`: isolated bot execution boundary with strict resource/timeout limits.
+- `Protocol Adapter`: builds normalized state payload for bot `act()` with full player/action context.
+
+## Extended Runtime Flow
+1. User logs in via `POST /api/v1/auth/login`; backend issues authenticated session/token.
+2. Authenticated user uploads bots via `POST /api/v1/my/bots`; metadata and artifacts are stored.
+3. Lobby page calls `GET /api/v1/lobby/tables` and `GET /api/v1/lobby/leaderboard`.
+4. User creates table via `POST /api/v1/lobby/tables` or opens an existing table.
+5. At seat time, user either:
+   - selects existing bot (`POST /tables/{table_id}/seats/{seat_id}/bot-select`), or
+   - uploads inline and then selects.
+6. Match loop calls Bot Runtime Supervisor, which:
+   - executes bot in isolated boundary,
+   - applies timeout and error guardrails,
+   - returns normalized action or controlled fallback.
+7. After each hand, table history and leaderboard aggregates are updated in persistent storage.
+
+## Extended Repository Layout
+- `backend/app/auth/` - auth routes, session utilities, auth middleware/dependencies.
+- `backend/app/models/` - persistent models for users, bots, tables, leaderboard rows.
+- `backend/app/services/bot_registry_service.py` - user bot management logic.
+- `backend/app/services/lobby_service.py` - table create/list/open logic.
+- `backend/app/services/leaderboard_service.py` - aggregate metrics and ranking.
+- `backend/app/bots/supervisor.py` - isolated bot process/container execution orchestration.
+- `backend/app/bots/protocol.py` - versioned bot-state payload builders.
+- `frontend/login.html` - login route entrypoint (or SPA login route if existing app shell is adopted).
+- `frontend/my-bots.*` - My Bots page script/style assets.
+- `frontend/lobby.*` - Lobby list/create/leaderboard assets.
+
+## Persistence Strategy (Batch 2)
+- Move from memory+files-only to persistent storage for:
+  - users
+  - bot catalog metadata
+  - table metadata
+  - historical leaderboard aggregates
+- Keep runtime hand history text file output for compatibility, while storing query metadata in DB.
+- Default implementation target: SQLite for local/dev with migration path to Postgres.
+
+## Extended State Model
+### `User`
+- `user_id`: string/uuid
+- `username`: string
+- `password_hash` or external provider subject id
+- `created_at`: timestamp
+
+### `BotRecord`
+- `bot_id`: string/uuid
+- `owner_user_id`: fk `User`
+- `name`: string
+- `version`: string
+- `artifact_path`: filesystem/object store path
+- `created_at`: timestamp
+
+### `TableRecord`
+- `table_id`: string/uuid
+- `created_by_user_id`: fk `User`
+- `small_blind`: numeric
+- `big_blind`: numeric
+- `status`: `waiting|running|finished`
+- `created_at`: timestamp
+
+### `LeaderboardRow`
+- `bot_id`: fk `BotRecord`
+- `hands_played`: integer
+- `bb_won`: numeric
+- `bb_per_hand`: numeric (derived or persisted cache)
+- `updated_at`: timestamp
+
+## Isolation and Security Hardening (Batch 2)
+- Require isolated bot execution boundary (separate process minimum, container sandbox preferred).
+- Enforce CPU/time/memory limits on bot decision calls.
+- Deny inbound/outbound network from bot runtime unless explicitly enabled in future.
+- Expose explicit protocol version field in bot context payload.
+- Log per-bot runtime failures without impacting API availability.

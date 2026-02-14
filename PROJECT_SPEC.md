@@ -132,3 +132,100 @@ Runtime behavior:
 - Bot timeout scenario.
 - Bot throws runtime exception scenario.
 - Invalid bot payload scenario.
+
+## Batch 2 Expansion (Planned)
+This section extends MVP scope for the next implementation batch. Existing MVP requirements remain valid unless explicitly superseded below.
+
+## Expanded Goals
+- Add authenticated user experience with a login page and persistent header/menu.
+- Add `My Bots` page where users can upload, view, and manage personal bots.
+- Let users select one of their uploaded bots when taking a seat, or upload directly from the seating flow.
+- Move from single-table entry to a lobby page with table list and create-table flow.
+- Add a persistent all-time leaderboard showing bot performance in `bb/hand`.
+- Strengthen bot runtime isolation while improving server-to-bot state communication.
+
+## Expanded Scope
+### In Scope
+- Login/logout flow for web users.
+- Per-user bot catalog (`My Bots`) with bot metadata and artifact storage.
+- Multi-table lobby and table detail pages.
+- Table creation by users.
+- Persistent leaderboard across all historical hands.
+- Bot runtime protocol updates so bots can track other players and full hand action history.
+
+### Out of Scope
+- Social features (friends, chat, invites).
+- Real-money wallets, rake, or payments.
+- Cross-region distributed matchmaking.
+
+## Functional Requirements (Batch 2)
+- `FR-12`: App has a dedicated login page and authenticated app shell with header navigation.
+- `FR-13`: Header includes links to Lobby, My Bots, and Logout.
+- `FR-14`: Unauthenticated users are redirected to login for protected routes.
+- `FR-15`: `My Bots` lists all bots owned by the current user with `bot_id`, name, version, status, and created timestamp.
+- `FR-16`: User can upload a new bot from `My Bots` and receive clear validation feedback.
+- `FR-17`: Seating flow supports selecting an existing owned bot or uploading a new bot inline.
+- `FR-18`: Main page becomes Lobby and shows available tables with key status fields (table id, stakes/blinds, seats filled, state).
+- `FR-19`: User can create a new table from Lobby.
+- `FR-20`: Opening a table route shows the existing table experience (table view, PnL chart, hand summary/history).
+- `FR-21`: System stores per-bot cumulative performance and exposes leaderboard sorted by `bb/hand`.
+- `FR-22`: Leaderboard includes bots that have played historically, not only currently seated bots.
+- `FR-23`: Bot runtime is isolated from API process (separate execution boundary and resource/time limits).
+- `FR-24`: Server sends bots structured table context including player ids, seats, stacks, board, pot, legal actions, and complete prior hand actions.
+- `FR-25`: Bot action interface remains backward compatible where possible, with explicit versioning for new context fields.
+- `FR-26`: All new data (users, bots, tables, leaderboard aggregates) is persisted across process restarts.
+
+## API Surface (Batch 2 Additions)
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/my/bots`
+- `POST /api/v1/my/bots`
+- `GET /api/v1/lobby/tables`
+- `POST /api/v1/lobby/tables`
+- `GET /api/v1/lobby/leaderboard`
+- `POST /api/v1/tables/{table_id}/seats/{seat_id}/bot-select`
+
+## Acceptance Criteria (Batch 2)
+- [ ] `AC-08` Unauthenticated access to Lobby/My Bots redirects to login.
+- [ ] `AC-09` After successful login, header/menu is visible on protected pages.
+- [ ] `AC-10` `My Bots` supports upload and displays bot cards with stable ids and metadata.
+- [ ] `AC-11` Seating supports both selecting existing bot and direct upload.
+- [ ] `AC-12` Lobby lists current tables and supports creating a new table.
+- [ ] `AC-13` Opening a table from Lobby displays live table details, chart, and hand summary/history.
+- [ ] `AC-14` Leaderboard returns historically active bots and persistent `bb/hand` values.
+- [ ] `AC-15` Bot runtime failures or timeouts do not crash the server and are contained.
+- [ ] `AC-16` Bot context payload includes enough information for tracking all opponents and actions.
+
+## Open Questions for Clarification
+- `Q-01`: Authentication method for this batch: local username/password only, or OAuth provider(s)?
+- `Q-02`: Should bot visibility be private-only, or is shared/public bot visibility needed?
+- `Q-03`: Can one bot sit at multiple tables concurrently, or should each deployment require a distinct instance/lock?
+- `Q-04`: For "own database" support, is persistent per-bot writable storage required now, or can v1 isolate compute/runtime only?
+- `Q-05`: Leaderboard scope: global across all stakes/tables, or filtered by blinds/table type?
+
+## Test Strategy Additions (Batch 2)
+### Backend Unit Tests
+- Auth/session helpers and access-control guards.
+- Bot catalog validation and metadata model.
+- Leaderboard metric calculation (`bb/hand`) and persistence behavior.
+- Bot context serializer for full player/action visibility.
+
+### Backend Integration Tests
+- Login -> protected endpoint access -> logout flow.
+- My Bots upload/list flow with ownership enforcement.
+- Lobby table create/list flow and table navigation payloads.
+- Seat-by-selection flow using stored bot artifacts.
+- Process restart persistence for users/bots/tables/leaderboard.
+
+### UI Tests
+- Route guards and login redirect behavior.
+- Header navigation rendering for authenticated sessions.
+- `My Bots` upload + list rendering.
+- Lobby list/create interaction.
+- Seat bot-select and inline-upload flows.
+
+### Isolation/Safety Tests
+- Bot timeout and crash containment in isolated runtime.
+- Attempted disallowed runtime access from bot process.
+- Malformed context handling in bot decision calls.

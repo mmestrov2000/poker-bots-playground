@@ -229,6 +229,19 @@ button:disabled {
   background: #fbfbf8;
   display: grid;
   gap: 0.75rem;
+  width: min(900px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+}
+
+.seat-assignment-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 23, 17, 0.52);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 50;
 }
 
 .seat-assignment-header {

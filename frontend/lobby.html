@@ -68,35 +68,6 @@
             </div>
           </section>
 
-          <section id="seat-assignment-panel" class="seat-assignment hidden" aria-live="polite">
-            <div class="seat-assignment-header">
-              <h3 id="seat-assignment-title">Seat Assignment</h3>
-              <button id="seat-assignment-close" type="button" class="button-ghost">Close</button>
-            </div>
-
-            <div class="seat-assignment-grid">
-              <form id="seat-select-existing-form" class="seat-assignment-form">
-                <h4>Choose Existing Bot</h4>
-                <label class="field-label" for="seat-existing-bot-id">My Bots</label>
-                <select id="seat-existing-bot-id" name="bot_id"></select>
-                <button id="seat-select-existing-submit" type="submit">Seat Selected Bot</button>
-              </form>
-
-              <form id="seat-create-new-form" class="seat-assignment-form">
-                <h4>Create New Bot</h4>
-                <label class="field-label" for="seat-new-name">Bot Name</label>
-                <input id="seat-new-name" name="name" type="text" maxlength="120" required />
-                <label class="field-label" for="seat-new-version">Version</label>
-                <input id="seat-new-version" name="version" type="text" maxlength="64" required />
-                <label class="field-label" for="seat-new-file">Bot Package (.zip)</label>
-                <input id="seat-new-file" name="bot_file" type="file" accept=".zip" required />
-                <button id="seat-create-new-submit" type="submit">Create and Seat</button>
-              </form>
-            </div>
-
-            <p id="seat-assignment-feedback" class="seat-assignment-feedback hidden"></p>
-          </section>
-
           <section class="match-controls">
             <div class="match-buttons">
               <button id="start-match">Start</button>
@@ -170,6 +141,37 @@
         </section>
       </section>
     </main>
+
+    <div id="seat-assignment-panel" class="seat-assignment-modal hidden" aria-hidden="true">
+      <section class="seat-assignment" role="dialog" aria-modal="true" aria-labelledby="seat-assignment-title" aria-live="polite">
+        <div class="seat-assignment-header">
+          <h3 id="seat-assignment-title">Seat Assignment</h3>
+          <button id="seat-assignment-close" type="button" class="button-ghost">Close</button>
+        </div>
+
+        <div class="seat-assignment-grid">
+          <form id="seat-select-existing-form" class="seat-assignment-form">
+            <h4>Choose Existing Bot</h4>
+            <label class="field-label" for="seat-existing-bot-id">My Bots</label>
+            <select id="seat-existing-bot-id" name="bot_id"></select>
+            <button id="seat-select-existing-submit" type="submit">Seat Selected Bot</button>
+          </form>
+
+          <form id="seat-create-new-form" class="seat-assignment-form">
+            <h4>Create New Bot</h4>
+            <label class="field-label" for="seat-new-name">Bot Name</label>
+            <input id="seat-new-name" name="name" type="text" maxlength="120" required />
+            <label class="field-label" for="seat-new-version">Version</label>
+            <input id="seat-new-version" name="version" type="text" maxlength="64" required />
+            <label class="field-label" for="seat-new-file">Bot Package (.zip)</label>
+            <input id="seat-new-file" name="bot_file" type="file" accept=".zip" required />
+            <button id="seat-create-new-submit" type="submit">Create and Seat</button>
+          </form>
+        </div>
+
+        <p id="seat-assignment-feedback" class="seat-assignment-feedback hidden"></p>
+      </section>
+    </div>
 
     <script src="/static/app-shell.js?v=__ASSET_VERSION__" defer></script>
     <script src="/static/lobby.js?v=__ASSET_VERSION__" defer></script>

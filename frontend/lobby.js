@@ -321,6 +321,7 @@
     activeSeatId = null;
     clearSeatAssignmentFeedback();
     seatAssignmentPanel?.classList.add("hidden");
+    seatAssignmentPanel?.setAttribute("aria-hidden", "true");
   }
 
   function renderOwnedBotOptions() {
@@ -420,7 +421,9 @@
       seatAssignmentTitle.textContent = `Seat ${seatId} Assignment`;
     }
     seatAssignmentPanel?.classList.remove("hidden");
+    seatAssignmentPanel?.setAttribute("aria-hidden", "false");
     await loadMyBotsForSeatPanel();
+    seatExistingSelect?.focus();
   }
 
   function renderHands(hands) {
@@ -599,6 +602,16 @@
     });
 
     document.getElementById("seat-assignment-close")?.addEventListener("click", closeSeatAssignmentPanel);
+    seatAssignmentPanel?.addEventListener("click", (event) => {
+      if (event.target === seatAssignmentPanel) {
+        closeSeatAssignmentPanel();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !seatAssignmentPanel?.classList.contains("hidden")) {
+        closeSeatAssignmentPanel();
+      }
+    });
     seatSelectExistingForm?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (seatAssignmentBusy) {

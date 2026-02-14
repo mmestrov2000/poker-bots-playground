@@ -2,12 +2,19 @@ import io
 import time
 import zipfile
 from datetime import datetime, timezone
+from http.cookies import SimpleCookie
+from pathlib import Path
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
+from starlette.requests import Request
 
 from app.api import routes
 from app.services.match_service import HandRecord, MatchService
+from app.auth.config import AuthSettings
+from app.auth.service import AuthError, AuthLockedError
+from app.auth.service import AuthService
+from app.auth.store import AuthStore
 from app.storage.hand_store import HandStore
 
 
@@ -38,11 +45,49 @@ def isolate_route_state(tmp_path, monkeypatch):
     uploads_dir.mkdir(parents=True, exist_ok=True)
     service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
     service.HAND_INTERVAL_SECONDS = 0.01
+    settings = AuthSettings(
+        session_cookie_name="ppg_session",
+        session_ttl_seconds=3600,
+        login_max_failures=3,
+        login_lockout_seconds=60,
+        login_failure_window_seconds=300,
+        bootstrap_username="bootstrap",
+        bootstrap_password="bootstrap-password",
+        db_path=Path(tmp_path / "auth.sqlite3"),
+    )
+    auth_service = AuthService(store=AuthStore(settings.db_path), settings=settings)
+    auth_service.ensure_user("alice", "correct-horse-battery-staple")
 
     monkeypatch.setattr(routes, "uploads_dir", uploads_dir)
     monkeypatch.setattr(routes, "match_service", service)
+    monkeypatch.setattr(routes, "auth_settings", settings)
+    monkeypatch.setattr(routes, "auth_service", auth_service)
     yield
     service.reset_match()
+
+
+def build_request_with_cookies(cookies: dict[str, str] | None = None) -> Request:
+    headers: list[tuple[bytes, bytes]] = []
+    if cookies:
+        cookie_header = "; ".join(f"{k}={v}" for k, v in cookies.items())
+        headers.append((b"cookie", cookie_header.encode("utf-8")))
+    scope = {
+        "type": "http",
+        "asgi.version": "3.0",
+        "method": "GET",
+        "path": "/",
+        "raw_path": b"/",
+        "query_string": b"",
+        "headers": headers,
+    }
+    return Request(scope)
+
+
+def extract_session_cookie(response: Response) -> str:
+    cookie = SimpleCookie()
+    cookie.load(response.headers["set-cookie"])
+    morsel = cookie[routes.auth_settings.session_cookie_name]
+    return morsel.value
 
 
 @pytest.mark.anyio
@@ -317,3 +362,66 @@ def test_get_hand_returns_404_for_unknown_hand():
         routes.get_hand("missing-hand")
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Hand not found"
+
+
+def test_auth_login_success_and_me_returns_user():
+    response = Response()
+    payload = routes.LoginRequest(username="alice", password="correct-horse-battery-staple")
+    login_result = routes.login(payload, response)
+    assert login_result["user"]["username"] == "alice"
+    session_id = extract_session_cookie(response)
+    assert session_id
+
+    request = build_request_with_cookies({routes.auth_settings.session_cookie_name: session_id})
+    me_response = routes.me(current_user=routes.require_authenticated_user(request))
+    assert me_response["user"]["username"] == "alice"
+
+
+def test_auth_login_failure_returns_401():
+    with pytest.raises(HTTPException) as exc_info:
+        routes.login(
+            routes.LoginRequest(username="alice", password="wrong-password"),
+            Response(),
+        )
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Invalid username or password"
+
+
+def test_protected_route_rejects_without_auth():
+    with pytest.raises(HTTPException) as exc_info:
+        routes.require_authenticated_user(build_request_with_cookies())
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Authentication required"
+
+
+def test_logout_invalidates_session():
+    response = Response()
+    login_result = routes.login(
+        routes.LoginRequest(username="alice", password="correct-horse-battery-staple"),
+        response,
+    )
+    assert login_result["user"]["username"] == "alice"
+    session_id = extract_session_cookie(response)
+
+    logout_request = build_request_with_cookies({routes.auth_settings.session_cookie_name: session_id})
+    logout_response = Response()
+    result = routes.logout(logout_request, logout_response)
+    assert result["ok"] is True
+
+    with pytest.raises(HTTPException) as exc_info:
+        routes.require_authenticated_user(logout_request)
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Authentication required"
+
+
+def test_login_bruteforce_lockout_behavior():
+    for _ in range(2):
+        with pytest.raises(AuthError):
+            routes.auth_service.login(username="alice", password="wrong-password")
+
+    with pytest.raises(AuthLockedError) as lockout_error:
+        routes.auth_service.login(username="alice", password="wrong-password")
+    assert lockout_error.value.retry_after_seconds > 0
+
+    with pytest.raises(AuthLockedError):
+        routes.auth_service.login(username="alice", password="correct-horse-battery-staple")

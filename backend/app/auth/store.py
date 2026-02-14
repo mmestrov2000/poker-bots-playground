@@ -12,17 +12,39 @@ class AuthStore:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._init_db()
+        self._harden_permissions()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self._db_path, timeout=5.0)
         connection.row_factory = sqlite3.Row
         return connection
 
+    def _harden_permissions(self) -> None:
+        """
+        Best-effort filesystem hardening for auth data at rest.
+        """
+        targets = [
+            self._db_path,
+            self._db_path.with_name(f"{self._db_path.name}-wal"),
+            self._db_path.with_name(f"{self._db_path.name}-shm"),
+        ]
+        for target in targets:
+            if not target.exists():
+                continue
+            try:
+                target.chmod(0o600)
+            except OSError:
+                # Ignore permission-setting failures on constrained filesystems.
+                continue
+
     def _init_db(self) -> None:
         with self._connect() as connection:
             connection.executescript(
                 """
                 PRAGMA journal_mode=WAL;
+                PRAGMA synchronous=FULL;
+                PRAGMA foreign_keys=ON;
+                PRAGMA secure_delete=ON;
                 CREATE TABLE IF NOT EXISTS users (
                     user_id TEXT PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,

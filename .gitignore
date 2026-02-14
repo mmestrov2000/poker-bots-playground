@@ -10,5 +10,8 @@ backend/.venv/
 *.code-workspace
 runtime/uploads/*
 runtime/hands/*
+runtime/auth.sqlite3
+runtime/auth.sqlite3-wal
+runtime/auth.sqlite3-shm
 !runtime/uploads/.gitkeep
 !runtime/hands/.gitkeep

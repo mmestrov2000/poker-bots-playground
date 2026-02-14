@@ -33,7 +33,25 @@ class LoginRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=1, max_length=64)
-    password: str = Field(min_length=1, max_length=1024)
+    password: str = Field(min_length=12, max_length=1024)
+
+
+def _should_set_secure_cookie(request: Request) -> bool:
+    if auth_settings.session_cookie_secure is not None:
+        return auth_settings.session_cookie_secure
+
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    scheme = forwarded_proto or request.url.scheme
+    if scheme == "https":
+        return True
+
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    hostname = host.split(",")[0].strip().split(":")[0].lower()
+    if hostname in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
+        return False
+
+    # Fail secure-by-default for non-local hosts when request scheme can't be trusted.
+    return True
 
 
 def require_authenticated_user(request: Request) -> dict:
@@ -50,7 +68,7 @@ def health() -> dict:
 
 
 @router.post("/auth/login")
-def login(payload: LoginRequest, response: Response) -> dict:
+def login(payload: LoginRequest, response: Response, request: Request) -> dict:
     try:
         user, session = auth_service.login(username=payload.username, password=payload.password)
     except AuthLockedError as exc:
@@ -68,7 +86,7 @@ def login(payload: LoginRequest, response: Response) -> dict:
         key=auth_settings.session_cookie_name,
         value=session["session_id"],
         httponly=True,
-        secure=True,
+        secure=_should_set_secure_cookie(request),
         samesite="lax",
         max_age=auth_settings.session_ttl_seconds,
         path="/",
@@ -77,7 +95,7 @@ def login(payload: LoginRequest, response: Response) -> dict:
 
 
 @router.post("/auth/register")
-def register(payload: RegisterRequest, response: Response) -> dict:
+def register(payload: RegisterRequest, response: Response, request: Request) -> dict:
     try:
         user, session = auth_service.register(username=payload.username, password=payload.password)
     except AuthError as exc:
@@ -87,7 +105,7 @@ def register(payload: RegisterRequest, response: Response) -> dict:
         key=auth_settings.session_cookie_name,
         value=session["session_id"],
         httponly=True,
-        secure=True,
+        secure=_should_set_secure_cookie(request),
         samesite="lax",
         max_age=auth_settings.session_ttl_seconds,
         path="/",

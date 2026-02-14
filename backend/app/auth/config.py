@@ -8,6 +8,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class AuthSettings:
     session_cookie_name: str
+    session_cookie_secure: bool | None
     session_ttl_seconds: int
     login_max_failures: int
     login_lockout_seconds: int
@@ -20,8 +21,15 @@ class AuthSettings:
     def from_env(cls, repo_root: Path) -> "AuthSettings":
         runtime_dir = repo_root / "runtime"
         runtime_dir.mkdir(parents=True, exist_ok=True)
+        raw_cookie_secure = os.getenv("APP_SESSION_COOKIE_SECURE")
+        session_cookie_secure: bool | None
+        if raw_cookie_secure is None:
+            session_cookie_secure = None
+        else:
+            session_cookie_secure = raw_cookie_secure.strip().lower() in {"1", "true", "yes", "on"}
         return cls(
             session_cookie_name=os.getenv("APP_SESSION_COOKIE_NAME", "ppg_session"),
+            session_cookie_secure=session_cookie_secure,
             session_ttl_seconds=int(os.getenv("APP_SESSION_TTL_SECONDS", "28800")),
             login_max_failures=int(os.getenv("APP_LOGIN_MAX_FAILURES", "5")),
             login_lockout_seconds=int(os.getenv("APP_LOGIN_LOCKOUT_SECONDS", "300")),

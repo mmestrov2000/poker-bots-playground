@@ -135,6 +135,12 @@ button:disabled {
   min-height: 1rem;
 }
 
+.form-success {
+  color: var(--accent);
+  font-size: 0.88rem;
+  min-height: 1rem;
+}
+
 .layout {
   max-width: 1140px;
   margin: 0 auto;

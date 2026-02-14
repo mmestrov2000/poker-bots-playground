@@ -20,6 +20,7 @@ def isolate_route_state(tmp_path, monkeypatch):
 
     settings = AuthSettings(
         session_cookie_name="ppg_session",
+        session_cookie_secure=None,
         session_ttl_seconds=3600,
         login_max_failures=3,
         login_lockout_seconds=60,
@@ -39,6 +40,7 @@ def isolate_route_state(tmp_path, monkeypatch):
 
 def build_request_with_cookies(cookies: dict[str, str] | None = None) -> Request:
     headers: list[tuple[bytes, bytes]] = []
+    headers.append((b"host", b"localhost"))
     if cookies:
         cookie_header = "; ".join(f"{k}={v}" for k, v in cookies.items())
         headers.append((b"cookie", cookie_header.encode("utf-8")))
@@ -97,6 +99,7 @@ def test_frontend_route_guard_login_logout_navigation_smoke():
     login_result = routes.login(
         routes.LoginRequest(username="alice", password="correct-horse-battery-staple"),
         login_response,
+        build_request_with_cookies(),
     )
     assert login_result["user"]["username"] == "alice"
     session_id = extract_session_cookie(login_response)
@@ -124,6 +127,7 @@ def test_frontend_register_smoke_and_duplicate_username_guard():
     register_result = routes.register(
         routes.RegisterRequest(username="new-player", password="new-password"),
         register_response,
+        build_request_with_cookies(),
     )
     assert register_result["user"]["username"] == "new-player"
     session_id = extract_session_cookie(register_response)
@@ -135,5 +139,6 @@ def test_frontend_register_smoke_and_duplicate_username_guard():
         routes.register(
             routes.RegisterRequest(username="new-player", password="different-password"),
             Response(),
+            build_request_with_cookies(),
         )
     assert duplicate_error.value.status_code == 409

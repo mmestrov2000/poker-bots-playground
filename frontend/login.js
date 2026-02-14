@@ -11,6 +11,7 @@
 
   const usernameError = document.getElementById("auth-username-error");
   const passwordError = document.getElementById("auth-password-error");
+  const formSuccess = document.getElementById("auth-form-success");
   const formError = document.getElementById("auth-form-error");
 
   let authMode = "login";
@@ -37,7 +38,7 @@
     return response.json();
   }
 
-  function setTextError(element, message) {
+  function setTextMessage(element, message) {
     if (!element) {
       return;
     }
@@ -51,9 +52,10 @@
   }
 
   function clearErrors() {
-    setTextError(usernameError, "");
-    setTextError(passwordError, "");
-    setTextError(formError, "");
+    setTextMessage(usernameError, "");
+    setTextMessage(passwordError, "");
+    setTextMessage(formError, "");
+    setTextMessage(formSuccess, "");
     usernameInput.classList.remove("input-error");
     passwordInput.classList.remove("input-error");
   }
@@ -89,12 +91,16 @@
     if (!username) {
       valid = false;
       usernameInput.classList.add("input-error");
-      setTextError(usernameError, "Username is required.");
+      setTextMessage(usernameError, "Username is required.");
     }
     if (!password) {
       valid = false;
       passwordInput.classList.add("input-error");
-      setTextError(passwordError, "Password is required.");
+      setTextMessage(passwordError, "Password is required.");
+    } else if (authMode === "register" && password.length < 12) {
+      valid = false;
+      passwordInput.classList.add("input-error");
+      setTextMessage(passwordError, "Password must be at least 12 characters.");
     }
 
     return { valid, username, password };
@@ -119,20 +125,25 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      window.location.assign("/lobby");
+      if (authMode === "register") {
+        setTextMessage(formSuccess, "Account created successfully. Signing you in...");
+      }
+      window.setTimeout(() => {
+        window.location.assign("/lobby");
+      }, authMode === "register" ? 650 : 0);
     } catch (error) {
       if (error.statusCode === 401) {
-        setTextError(formError, "Invalid username or password.");
+        setTextMessage(formError, "Invalid username or password.");
       } else if (error.statusCode === 409) {
-        setTextError(formError, "Username is already taken.");
+        setTextMessage(formError, "Username is already taken.");
       } else if (error.statusCode === 429) {
         const retry = Number(error.detail?.retry_after_seconds);
         const message = Number.isFinite(retry)
           ? `Too many attempts. Retry in ${retry} seconds.`
           : "Too many attempts. Please retry later.";
-        setTextError(formError, message);
+        setTextMessage(formError, message);
       } else {
-        setTextError(formError, error.message || "Authentication failed.");
+        setTextMessage(formError, error.message || "Authentication failed.");
       }
       setSubmitting(false);
     }
@@ -147,7 +158,7 @@
       return;
     } catch (error) {
       if (error.statusCode !== 401) {
-        setTextError(formError, "Unable to verify current session.");
+        setTextMessage(formError, "Unable to verify current session.");
       }
     }
 
@@ -156,7 +167,7 @@
     form.addEventListener("submit", (event) => {
       handleSubmit(event).catch((error) => {
         console.error(error);
-        setTextError(formError, "Authentication failed.");
+        setTextMessage(formError, "Authentication failed.");
         setSubmitting(false);
       });
     });
@@ -164,6 +175,6 @@
 
   bootstrap().catch((error) => {
     console.error(error);
-    setTextError(formError, "Failed to initialize login page.");
+    setTextMessage(formError, "Failed to initialize login page.");
   });
 })();

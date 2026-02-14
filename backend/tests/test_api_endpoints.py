@@ -47,6 +47,7 @@ def isolate_route_state(tmp_path, monkeypatch):
     service.HAND_INTERVAL_SECONDS = 0.01
     settings = AuthSettings(
         session_cookie_name="ppg_session",
+        session_cookie_secure=None,
         session_ttl_seconds=3600,
         login_max_failures=3,
         login_lockout_seconds=60,
@@ -66,14 +67,23 @@ def isolate_route_state(tmp_path, monkeypatch):
     service.reset_match()
 
 
-def build_request_with_cookies(cookies: dict[str, str] | None = None) -> Request:
+def build_request_with_cookies(
+    cookies: dict[str, str] | None = None,
+    host: str = "localhost",
+    scheme: str = "http",
+    extra_headers: list[tuple[bytes, bytes]] | None = None,
+) -> Request:
     headers: list[tuple[bytes, bytes]] = []
+    headers.append((b"host", host.encode("utf-8")))
     if cookies:
         cookie_header = "; ".join(f"{k}={v}" for k, v in cookies.items())
         headers.append((b"cookie", cookie_header.encode("utf-8")))
+    if extra_headers:
+        headers.extend(extra_headers)
     scope = {
         "type": "http",
         "asgi.version": "3.0",
+        "scheme": scheme,
         "method": "GET",
         "path": "/",
         "raw_path": b"/",
@@ -88,6 +98,12 @@ def extract_session_cookie(response: Response) -> str:
     cookie.load(response.headers["set-cookie"])
     morsel = cookie[routes.auth_settings.session_cookie_name]
     return morsel.value
+
+
+def extract_cookie_morsel(response: Response):
+    cookie = SimpleCookie()
+    cookie.load(response.headers["set-cookie"])
+    return cookie[routes.auth_settings.session_cookie_name]
 
 
 @pytest.mark.anyio
@@ -367,7 +383,7 @@ def test_get_hand_returns_404_for_unknown_hand():
 def test_auth_login_success_and_me_returns_user():
     response = Response()
     payload = routes.LoginRequest(username="alice", password="correct-horse-battery-staple")
-    login_result = routes.login(payload, response)
+    login_result = routes.login(payload, response, build_request_with_cookies())
     assert login_result["user"]["username"] == "alice"
     session_id = extract_session_cookie(response)
     assert session_id
@@ -380,7 +396,7 @@ def test_auth_login_success_and_me_returns_user():
 def test_auth_register_success_sets_session_and_me_returns_user():
     response = Response()
     payload = routes.RegisterRequest(username="new-player", password="new-password")
-    register_result = routes.register(payload, response)
+    register_result = routes.register(payload, response, build_request_with_cookies())
     assert register_result["user"]["username"] == "new-player"
     session_id = extract_session_cookie(response)
     assert session_id
@@ -393,8 +409,9 @@ def test_auth_register_success_sets_session_and_me_returns_user():
 def test_auth_register_duplicate_username_returns_409():
     with pytest.raises(HTTPException) as exc_info:
         routes.register(
-            routes.RegisterRequest(username="alice", password="anything"),
+            routes.RegisterRequest(username="alice", password="anything-long"),
             Response(),
+            build_request_with_cookies(),
         )
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "Username is already taken"
@@ -405,6 +422,7 @@ def test_auth_login_failure_returns_401():
         routes.login(
             routes.LoginRequest(username="alice", password="wrong-password"),
             Response(),
+            build_request_with_cookies(),
         )
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Invalid username or password"
@@ -422,6 +440,7 @@ def test_logout_invalidates_session():
     login_result = routes.login(
         routes.LoginRequest(username="alice", password="correct-horse-battery-staple"),
         response,
+        build_request_with_cookies(),
     )
     assert login_result["user"]["username"] == "alice"
     session_id = extract_session_cookie(response)
@@ -448,3 +467,29 @@ def test_login_bruteforce_lockout_behavior():
 
     with pytest.raises(AuthLockedError):
         routes.auth_service.login(username="alice", password="correct-horse-battery-staple")
+
+
+def test_auth_cookie_secure_flag_is_disabled_for_local_http():
+    response = Response()
+    routes.login(
+        routes.LoginRequest(username="alice", password="correct-horse-battery-staple"),
+        response,
+        build_request_with_cookies(host="localhost", scheme="http"),
+    )
+    morsel = extract_cookie_morsel(response)
+    assert not morsel["secure"]
+
+
+def test_auth_cookie_secure_flag_is_enabled_for_forwarded_https():
+    response = Response()
+    routes.login(
+        routes.LoginRequest(username="alice", password="correct-horse-battery-staple"),
+        response,
+        build_request_with_cookies(
+            host="example.com",
+            scheme="http",
+            extra_headers=[(b"x-forwarded-proto", b"https")],
+        ),
+    )
+    morsel = extract_cookie_morsel(response)
+    assert bool(morsel["secure"])

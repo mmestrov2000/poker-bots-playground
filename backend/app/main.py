@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api import routes as api_routes
@@ -55,19 +55,19 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=target, status_code=302)
 
         @app.get("/login", include_in_schema=False)
-        def serve_login(request: Request) -> HTMLResponse | RedirectResponse:
+        def serve_login(request: Request) -> Response:
             if is_authenticated(request):
                 return RedirectResponse(url="/lobby", status_code=302)
             return render_template("login")
 
         @app.get("/lobby", include_in_schema=False)
-        def serve_lobby(request: Request) -> HTMLResponse | RedirectResponse:
+        def serve_lobby(request: Request) -> Response:
             if not is_authenticated(request):
                 return RedirectResponse(url="/login", status_code=302)
             return render_template("lobby")
 
         @app.get("/my-bots", include_in_schema=False)
-        def serve_my_bots(request: Request) -> HTMLResponse | RedirectResponse:
+        def serve_my_bots(request: Request) -> Response:
             if not is_authenticated(request):
                 return RedirectResponse(url="/login", status_code=302)
             return render_template("my-bots")

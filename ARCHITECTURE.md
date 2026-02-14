@@ -111,7 +111,7 @@ The frontend provides two bot upload slots plus live hand list and hand detail v
 This section defines architectural additions for authentication, bot ownership, table lobby, leaderboard, and stronger runtime isolation.
 
 ## Extended Components
-- `Auth Service`: login/logout/session handling and route protection.
+- `Auth Service`: local username/password login/logout/session handling and route protection.
 - `User Store`: persistent user identity records.
 - `Bot Registry Service`: per-user bot metadata and artifact lifecycle.
 - `Table Lobby Service`: create/list/open table management.
@@ -120,7 +120,7 @@ This section defines architectural additions for authentication, bot ownership, 
 - `Protocol Adapter`: builds normalized state payload for bot `act()` with full player/action context.
 
 ## Extended Runtime Flow
-1. User logs in via `POST /api/v1/auth/login`; backend issues authenticated session/token.
+1. User logs in via `POST /api/v1/auth/login`; backend verifies username/password and issues authenticated session/token.
 2. Authenticated user uploads bots via `POST /api/v1/my/bots`; metadata and artifacts are stored.
 3. Lobby page calls `GET /api/v1/lobby/tables` and `GET /api/v1/lobby/leaderboard`.
 4. User creates table via `POST /api/v1/lobby/tables` or opens an existing table.
@@ -187,6 +187,15 @@ This section defines architectural additions for authentication, bot ownership, 
 ## Isolation and Security Hardening (Batch 2)
 - Require isolated bot execution boundary (separate process minimum, container sandbox preferred).
 - Enforce CPU/time/memory limits on bot decision calls.
-- Deny inbound/outbound network from bot runtime unless explicitly enabled in future.
+- Deny bot access to platform-private services/storage and internal control-plane endpoints.
+- Allow policy-controlled outbound connectivity so bots can use bot-managed services/databases when needed.
 - Expose explicit protocol version field in bot context payload.
 - Log per-bot runtime failures without impacting API availability.
+
+## M4-T1 Policy Decisions
+- Auth scope: username/password only in Batch 2 (no OAuth provider integration).
+- Session model: server-side session with `HttpOnly` secure cookies.
+- Visibility scope:
+  - Bot source/artifacts/private metadata: owner-only.
+  - Leaderboard metrics: public global ranking.
+- Seating policy: same `bot_id` is allowed at multiple tables concurrently.

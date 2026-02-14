@@ -170,6 +170,12 @@ This section extends MVP scope for the next implementation batch. Existing MVP r
 - `FR-24`: Server sends bots structured table context including player ids, seats, stacks, board, pot, legal actions, and complete prior hand actions.
 - `FR-25`: Bot action interface remains backward compatible where possible, with explicit versioning for new context fields.
 - `FR-26`: All new data (users, bots, tables, leaderboard aggregates) is persisted across process restarts.
+- `FR-27`: Authentication for Batch 2 is local username/password only (no OAuth in this batch).
+- `FR-28`: Bot source packages and implementation details are private to owners and never exposed in public APIs.
+- `FR-29`: Leaderboard visibility is public and global across all historical tables/stakes.
+- `FR-30`: A single bot can be seated at multiple tables concurrently.
+- `FR-31`: Bot runtime may use bot-managed persistence/services (including external databases) while remaining isolated from platform internals.
+- `FR-32`: Session model for web clients is server-side session with `HttpOnly` secure cookie authentication.
 
 ## API Surface (Batch 2 Additions)
 - `POST /api/v1/auth/login`
@@ -182,6 +188,12 @@ This section extends MVP scope for the next implementation batch. Existing MVP r
 - `GET /api/v1/lobby/leaderboard`
 - `POST /api/v1/tables/{table_id}/seats/{seat_id}/bot-select`
 
+## Security Requirements (Batch 2 Auth)
+- Passwords are never stored in plaintext; store salted adaptive hashes (`argon2id` preferred, `bcrypt` acceptable fallback).
+- Login endpoint applies brute-force protections (rate limit and temporary lockout/backoff).
+- Authenticated session/token must have expiration, logout invalidation, and secure transport-only handling.
+- Protected endpoints must enforce authentication and ownership checks server-side (no client-trust assumptions).
+
 ## Acceptance Criteria (Batch 2)
 - [ ] `AC-08` Unauthenticated access to Lobby/My Bots redirects to login.
 - [ ] `AC-09` After successful login, header/menu is visible on protected pages.
@@ -192,13 +204,18 @@ This section extends MVP scope for the next implementation batch. Existing MVP r
 - [ ] `AC-14` Leaderboard returns historically active bots and persistent `bb/hand` values.
 - [ ] `AC-15` Bot runtime failures or timeouts do not crash the server and are contained.
 - [ ] `AC-16` Bot context payload includes enough information for tracking all opponents and actions.
+- [ ] `AC-17` Username/password login enforces secure password storage and authenticated session checks.
+- [ ] `AC-18` Bot code/artifacts are private; leaderboard entries remain publicly readable.
+- [ ] `AC-19` The same `bot_id` can be seated at multiple tables without forced locking.
+- [ ] `AC-20` Bot runtime can maintain bot-owned persistence without direct access to platform private data stores.
 
-## Open Questions for Clarification
-- `Q-01`: Authentication method for this batch: local username/password only, or OAuth provider(s)?
-- `Q-02`: Should bot visibility be private-only, or is shared/public bot visibility needed?
-- `Q-03`: Can one bot sit at multiple tables concurrently, or should each deployment require a distinct instance/lock?
-- `Q-04`: For "own database" support, is persistent per-bot writable storage required now, or can v1 isolate compute/runtime only?
-- `Q-05`: Leaderboard scope: global across all stakes/tables, or filtered by blinds/table type?
+## M4-T1 Decisions (Locked)
+- `D-01`: Auth method is local username/password only for Batch 2.
+- `D-02`: Bot implementations/artifacts are private to owners; only performance data is public.
+- `D-03`: One bot can be seated concurrently at multiple tables.
+- `D-04`: Bots are runtime-isolated from platform internals and can use bot-managed persistence/services.
+- `D-05`: Leaderboard scope is global ranking.
+- `D-06`: Auth transport uses `HttpOnly` secure session cookies (server-managed session state).
 
 ## Test Strategy Additions (Batch 2)
 ### Backend Unit Tests
@@ -223,5 +240,6 @@ This section extends MVP scope for the next implementation batch. Existing MVP r
 
 ### Isolation/Safety Tests
 - Bot timeout and crash containment in isolated runtime.
-- Attempted disallowed runtime access from bot process.
+- Attempted access from bot process to platform-private services/data is denied.
+- Bot runtime connectivity to bot-managed persistence endpoint works under policy.
 - Malformed context handling in bot decision calls.

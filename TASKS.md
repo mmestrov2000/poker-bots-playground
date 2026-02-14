@@ -104,11 +104,13 @@ Goal: keep Hand Detail stable until a user selects a different hand.
 ## Milestone 4: Auth, Header Navigation, and My Bots
 Goal: add authenticated user flow and owned bot management UX.
 
-- [ ] `M4-T1` Finalize auth/session decisions and document constraints (owner: `main-agent`)
+- [x] `M4-T1` Finalize auth/session decisions and document constraints (owner: `main-agent`)
   - Subtasks:
-  - Confirm local auth vs OAuth for this batch.
-  - Confirm session model (cookie vs token) and protected route policy.
-  - Record decisions in `PROJECT_SPEC.md` and `ARCHITECTURE.md`.
+  - Confirm local auth vs OAuth for this batch. Done: username/password only.
+  - Confirm session model (cookie vs token) and protected route policy. Done: server-side session with `HttpOnly` secure cookies and route protection on My Bots/Lobby/seat select.
+  - Record decisions in `PROJECT_SPEC.md` and `ARCHITECTURE.md`. Done.
+  - Lock visibility/seating/leaderboard policy decisions. Done: private bots, public global leaderboard, multi-table seating per bot.
+  - Lock bot isolation intent for bot-managed persistence. Done.
   - Acceptance: Auth decisions are explicit and unambiguous for implementation.
   - Test Strategy: Doc review checklist and architecture/spec consistency pass.
 - [ ] `M4-T2` Implement backend auth endpoints and protected-route dependency (owner: `feature-agent`)

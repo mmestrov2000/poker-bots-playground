@@ -85,6 +85,11 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'id="seat-1-take"' in lobby_html
     assert 'id="seat-6-take"' in lobby_html
     assert 'id="start-match"' in lobby_html
+    assert 'id="seat-assignment-panel"' in lobby_html
+    assert 'id="seat-existing-bot-id"' in lobby_html
+    assert 'id="seat-select-existing-form"' in lobby_html
+    assert 'id="seat-create-new-form"' in lobby_html
+    assert 'id="seat-assignment-feedback"' in lobby_html
 
     assert 'id="my-bots-list"' in my_bots_html
     assert 'id="my-bots-upload-form"' in my_bots_html
@@ -171,3 +176,13 @@ def test_frontend_my_bots_script_smoke_for_page_load_upload_and_states():
     assert "No bots uploaded yet." in my_bots_js
     assert "Failed to load bots." in my_bots_js
     assert "Upload failed." in my_bots_js
+
+
+def test_frontend_lobby_script_smoke_for_seat_select_and_inline_create():
+    frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+    lobby_js = (frontend_dir / "lobby.js").read_text(encoding="utf-8")
+
+    assert 'window.AppShell.request("/my/bots")' in lobby_js
+    assert 'window.AppShell.request(`/tables/default/seats/${activeSeatId}/bot-select`' in lobby_js
+    assert 'window.AppShell.request("/my/bots", {' in lobby_js
+    assert "New bot created and seated successfully." in lobby_js

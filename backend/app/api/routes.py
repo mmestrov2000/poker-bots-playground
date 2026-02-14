@@ -235,11 +235,26 @@ def select_bot_for_seat(
     current_user: dict = Depends(require_authenticated_user),
 ) -> dict:
     normalized_seat = seat_id.upper()
-    if normalized_seat not in {"A", "B"}:
-        raise HTTPException(status_code=400, detail="seat_id must be A or B")
-    if payload is not None:
-        require_owned_bot(payload.bot_id, current_user=current_user)
-    raise HTTPException(status_code=501, detail="Seat bot selection is not implemented yet")
+    if normalized_seat not in set(SEAT_ORDER):
+        raise HTTPException(status_code=400, detail="seat_id must be 1-6")
+    if payload is None:
+        raise HTTPException(status_code=400, detail="bot_id is required")
+
+    bot = require_owned_bot(payload.bot_id, current_user=current_user)
+    artifact_path = Path(bot["artifact_path"])
+    if not artifact_path.exists():
+        raise HTTPException(status_code=400, detail="Bot artifact is unavailable")
+
+    try:
+        seat = match_service.register_bot(
+            normalized_seat,
+            bot["name"],
+            bot_path=artifact_path,
+        )
+    except BotLoadError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {"seat": seat, "match": match_service.get_match(), "bot": _format_bot_for_response(bot)}
 
 
 @router.get("/seats")

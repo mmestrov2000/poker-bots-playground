@@ -180,7 +180,7 @@ Goal: add authenticated user flow and owned bot management UX.
   - Add empty/loading/error states.
   - Acceptance: User can upload and then see bot card rendered with persisted metadata.
   - Test Strategy: Manual UI scenario test plus scripted frontend smoke checks.
-- [ ] `M4-T6` Add seat flow support for selecting existing bot or inline upload (owner: `feature-agent`)
+- [x] `M4-T6` Add seat flow support for selecting existing bot or inline upload (owner: `feature-agent`)
   - Subtasks:
   - Add `POST /api/v1/tables/{table_id}/seats/{seat_id}/bot-select`.
   - Update seat UI to choose from owned bots or upload directly.

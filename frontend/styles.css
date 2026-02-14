@@ -222,6 +222,58 @@ button:disabled {
   gap: 0.75rem;
 }
 
+.seat-assignment {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fbfbf8;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.seat-assignment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.seat-assignment-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.seat-assignment-form {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.seat-assignment-form select,
+.seat-assignment-form input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  background: #fff;
+}
+
+.seat-assignment-feedback {
+  min-height: 1rem;
+  font-weight: 600;
+}
+
+.seat-assignment-feedback.is-success {
+  color: var(--accent);
+}
+
+.seat-assignment-feedback.is-error {
+  color: var(--danger);
+}
+
 .poker-table {
   position: relative;
   min-height: 360px;
@@ -705,6 +757,10 @@ button:disabled {
   }
 
   .my-bots-upload-form {
+    grid-template-columns: 1fr;
+  }
+
+  .seat-assignment-grid {
     grid-template-columns: 1fr;
   }
 

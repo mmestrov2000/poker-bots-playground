@@ -18,6 +18,9 @@
   let seatNames = {};
   let pnlVisibility = {};
   let refreshTimer = null;
+  let activeSeatId = null;
+  let myBotsCache = [];
+  let seatAssignmentBusy = false;
 
   const handDetailTabs = {
     logs: document.getElementById("hand-detail-logs"),
@@ -33,6 +36,14 @@
     ),
   };
   const leaderboardList = document.getElementById("leaderboard-list");
+  const seatAssignmentPanel = document.getElementById("seat-assignment-panel");
+  const seatAssignmentTitle = document.getElementById("seat-assignment-title");
+  const seatAssignmentFeedback = document.getElementById("seat-assignment-feedback");
+  const seatExistingSelect = document.getElementById("seat-existing-bot-id");
+  const seatSelectExistingSubmit = document.getElementById("seat-select-existing-submit");
+  const seatCreateNewSubmit = document.getElementById("seat-create-new-submit");
+  const seatSelectExistingForm = document.getElementById("seat-select-existing-form");
+  const seatCreateNewForm = document.getElementById("seat-create-new-form");
 
   function updateSeatStatus(seats) {
     const byId = Object.fromEntries(seats.map((seat) => [seat.seat_id, seat]));
@@ -50,12 +61,8 @@
       }
 
       const seatButton = document.getElementById(`seat-${seatId}-take`);
-      const seatInput = document.getElementById(`seat-${seatId}-file`);
       if (seatButton) {
         seatButton.disabled = seatReady;
-      }
-      if (seatInput) {
-        seatInput.disabled = seatReady;
       }
 
       if (seatReady) {
@@ -292,26 +299,128 @@
     endButton.disabled = !(match.status === "running" || match.status === "paused");
   }
 
-  async function uploadSeat(seatId) {
-    const input = document.getElementById(`seat-${seatId}-file`);
-    const file = input?.files?.[0];
-    if (!file) {
-      alert(`Select a .zip file for Seat ${seatId} first.`);
+  function setSeatAssignmentFeedback(message, type = "error") {
+    if (!seatAssignmentFeedback) {
       return;
     }
+    seatAssignmentFeedback.textContent = message;
+    seatAssignmentFeedback.classList.remove("hidden", "is-success", "is-error");
+    seatAssignmentFeedback.classList.add(type === "success" ? "is-success" : "is-error");
+  }
 
-    const formData = new FormData();
-    formData.append("bot_file", file);
+  function clearSeatAssignmentFeedback() {
+    if (!seatAssignmentFeedback) {
+      return;
+    }
+    seatAssignmentFeedback.textContent = "";
+    seatAssignmentFeedback.classList.add("hidden");
+    seatAssignmentFeedback.classList.remove("is-success", "is-error");
+  }
 
-    await window.AppShell.request(`/seats/${seatId}/bot`, {
+  function closeSeatAssignmentPanel() {
+    activeSeatId = null;
+    clearSeatAssignmentFeedback();
+    seatAssignmentPanel?.classList.add("hidden");
+  }
+
+  function renderOwnedBotOptions() {
+    if (!seatExistingSelect) {
+      return;
+    }
+    seatExistingSelect.innerHTML = "";
+    if (!myBotsCache.length) {
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = "No bots uploaded yet";
+      seatExistingSelect.appendChild(emptyOption);
+      seatExistingSelect.disabled = true;
+      if (seatSelectExistingSubmit) {
+        seatSelectExistingSubmit.disabled = true;
+      }
+      return;
+    }
+    myBotsCache.forEach((bot) => {
+      const option = document.createElement("option");
+      option.value = bot.bot_id;
+      option.textContent = `${bot.name} (${bot.version || "-"})`;
+      seatExistingSelect.appendChild(option);
+    });
+    seatExistingSelect.disabled = false;
+    if (seatSelectExistingSubmit) {
+      seatSelectExistingSubmit.disabled = false;
+    }
+  }
+
+  async function loadMyBotsForSeatPanel() {
+    const response = await window.AppShell.request("/my/bots");
+    myBotsCache = response.bots || [];
+    renderOwnedBotOptions();
+  }
+
+  async function seatExistingBot(botId) {
+    if (!activeSeatId) {
+      throw new Error("Select a seat first.");
+    }
+    await window.AppShell.request(`/tables/default/seats/${activeSeatId}/bot-select`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bot_id: botId }),
+    });
+  }
+
+  async function createAndSeatBot() {
+    if (!activeSeatId) {
+      throw new Error("Select a seat first.");
+    }
+    if (!seatCreateNewForm) {
+      throw new Error("Seat form is unavailable.");
+    }
+    const formData = new FormData(seatCreateNewForm);
+    const file = formData.get("bot_file");
+    if (!(file instanceof File) || !file.name) {
+      throw new Error("Select a .zip bot package.");
+    }
+    if (!file.name.toLowerCase().endsWith(".zip")) {
+      throw new Error("Only .zip bot uploads are supported.");
+    }
+
+    const created = await window.AppShell.request("/my/bots", {
       method: "POST",
       body: formData,
     });
+    const botId = created?.bot?.bot_id;
+    if (!botId) {
+      throw new Error("Bot creation failed.");
+    }
+    await seatExistingBot(botId);
+    seatCreateNewForm.reset();
+  }
 
-    input.value = "";
+  async function completeSeatAssignment(successMessage) {
     clearHandDetail();
     clearHandHistory();
     await refreshState();
+    setSeatAssignmentFeedback(successMessage, "success");
+  }
+
+  function setSeatAssignmentBusy(isBusy) {
+    seatAssignmentBusy = isBusy;
+    if (seatSelectExistingSubmit) {
+      seatSelectExistingSubmit.disabled = isBusy || Boolean(seatExistingSelect?.disabled);
+    }
+    if (seatCreateNewSubmit) {
+      seatCreateNewSubmit.disabled = isBusy;
+    }
+  }
+
+  async function openSeatAssignmentPanel(seatId) {
+    activeSeatId = seatId;
+    clearSeatAssignmentFeedback();
+    if (seatAssignmentTitle) {
+      seatAssignmentTitle.textContent = `Seat ${seatId} Assignment`;
+    }
+    seatAssignmentPanel?.classList.remove("hidden");
+    await loadMyBotsForSeatPanel();
   }
 
   function renderHands(hands) {
@@ -480,13 +589,54 @@
 
   function wireEvents() {
     seatIds.forEach((seatId) => {
-      const seatInput = document.getElementById(`seat-${seatId}-file`);
       const seatButton = document.getElementById(`seat-${seatId}-take`);
-      if (!seatInput || !seatButton) {
+      if (!seatButton) {
         return;
       }
-      seatButton.addEventListener("click", () => seatInput.click());
-      seatInput.addEventListener("change", () => uploadSeat(seatId).catch((error) => alert(error.message)));
+      seatButton.addEventListener("click", () =>
+        openSeatAssignmentPanel(seatId).catch((error) => alert(error.message))
+      );
+    });
+
+    document.getElementById("seat-assignment-close")?.addEventListener("click", closeSeatAssignmentPanel);
+    seatSelectExistingForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (seatAssignmentBusy) {
+        return;
+      }
+      const selectedBotId = seatExistingSelect?.value;
+      if (!selectedBotId) {
+        setSeatAssignmentFeedback("Select one of your bots first.");
+        return;
+      }
+      setSeatAssignmentBusy(true);
+      seatExistingBot(selectedBotId)
+        .then(() => completeSeatAssignment("Bot seated successfully."))
+        .catch((error) => {
+          if (error.statusCode === 401) {
+            window.location.assign("/login");
+            return;
+          }
+          setSeatAssignmentFeedback(error.message || "Failed to seat bot.");
+        })
+        .finally(() => setSeatAssignmentBusy(false));
+    });
+    seatCreateNewForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (seatAssignmentBusy) {
+        return;
+      }
+      setSeatAssignmentBusy(true);
+      createAndSeatBot()
+        .then(() => completeSeatAssignment("New bot created and seated successfully."))
+        .catch((error) => {
+          if (error.statusCode === 401) {
+            window.location.assign("/login");
+            return;
+          }
+          setSeatAssignmentFeedback(error.message || "Failed to create and seat bot.");
+        })
+        .finally(() => setSeatAssignmentBusy(false));
     });
 
     document.getElementById("start-match")?.addEventListener("click", () => startMatch().catch((error) => alert(error.message)));

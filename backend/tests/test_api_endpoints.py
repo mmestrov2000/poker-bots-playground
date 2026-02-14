@@ -507,6 +507,88 @@ async def test_my_bots_upload_rejects_invalid_payload():
     assert invalid_archive.value.detail == "Upload is not a valid zip archive"
 
 
+@pytest.mark.anyio
+async def test_seat_bot_select_supports_existing_owned_bot():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+"""
+        }
+    )
+    created = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("alpha.zip", payload),
+        name="Alpha",
+        version="1.0.0",
+    )
+
+    response = routes.select_bot_for_seat(
+        table_id="default",
+        seat_id="1",
+        payload=routes.SelectBotRequest(bot_id=created["bot"]["bot_id"]),
+        current_user=current_user,
+    )
+    assert response["seat"]["seat_id"] == "1"
+    assert response["seat"]["ready"] is True
+    assert response["seat"]["bot_name"] == "Alpha"
+    assert response["match"]["status"] == "waiting"
+
+
+@pytest.mark.anyio
+async def test_seat_bot_select_requires_ownership_and_valid_payload():
+    alice = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    bob = routes.auth_service.ensure_user("bob", "correct-horse-battery-staple")
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+"""
+        }
+    )
+    created = await routes.upload_my_bot(
+        current_user=bob,
+        bot_file=build_upload_file("bob.zip", payload),
+        name="Bob Bot",
+        version="2.0.0",
+    )
+
+    with pytest.raises(HTTPException) as missing_payload:
+        routes.select_bot_for_seat(
+            table_id="default",
+            seat_id="1",
+            payload=None,
+            current_user=alice,
+        )
+    assert missing_payload.value.status_code == 400
+    assert missing_payload.value.detail == "bot_id is required"
+
+    with pytest.raises(HTTPException) as invalid_seat:
+        routes.select_bot_for_seat(
+            table_id="default",
+            seat_id="A",
+            payload=routes.SelectBotRequest(bot_id=created["bot"]["bot_id"]),
+            current_user=alice,
+        )
+    assert invalid_seat.value.status_code == 400
+    assert invalid_seat.value.detail == "seat_id must be 1-6"
+
+    with pytest.raises(HTTPException) as forbidden:
+        routes.select_bot_for_seat(
+            table_id="default",
+            seat_id="1",
+            payload=routes.SelectBotRequest(bot_id=created["bot"]["bot_id"]),
+            current_user=alice,
+        )
+    assert forbidden.value.status_code == 403
+    assert forbidden.value.detail == "Forbidden"
+
+
 def test_auth_register_success_sets_session_and_me_returns_user():
     response = Response()
     payload = routes.RegisterRequest(username="new-player", password="new-password")

@@ -33,45 +33,68 @@
               <article class="seat seat-1">
                 <h2>Seat 1</h2>
                 <p id="seat-1-name" class="seat-name">Open seat</p>
-                <input id="seat-1-file" class="seat-input" type="file" accept=".zip" />
                 <button id="seat-1-take" class="seat-button">Take a seat</button>
               </article>
 
               <article class="seat seat-2">
                 <h2>Seat 2</h2>
                 <p id="seat-2-name" class="seat-name">Open seat</p>
-                <input id="seat-2-file" class="seat-input" type="file" accept=".zip" />
                 <button id="seat-2-take" class="seat-button">Take a seat</button>
               </article>
 
               <article class="seat seat-3">
                 <h2>Seat 3</h2>
                 <p id="seat-3-name" class="seat-name">Open seat</p>
-                <input id="seat-3-file" class="seat-input" type="file" accept=".zip" />
                 <button id="seat-3-take" class="seat-button">Take a seat</button>
               </article>
 
               <article class="seat seat-4">
                 <h2>Seat 4</h2>
                 <p id="seat-4-name" class="seat-name">Open seat</p>
-                <input id="seat-4-file" class="seat-input" type="file" accept=".zip" />
                 <button id="seat-4-take" class="seat-button">Take a seat</button>
               </article>
 
               <article class="seat seat-5">
                 <h2>Seat 5</h2>
                 <p id="seat-5-name" class="seat-name">Open seat</p>
-                <input id="seat-5-file" class="seat-input" type="file" accept=".zip" />
                 <button id="seat-5-take" class="seat-button">Take a seat</button>
               </article>
 
               <article class="seat seat-6">
                 <h2>Seat 6</h2>
                 <p id="seat-6-name" class="seat-name">Open seat</p>
-                <input id="seat-6-file" class="seat-input" type="file" accept=".zip" />
                 <button id="seat-6-take" class="seat-button">Take a seat</button>
               </article>
             </div>
+          </section>
+
+          <section id="seat-assignment-panel" class="seat-assignment hidden" aria-live="polite">
+            <div class="seat-assignment-header">
+              <h3 id="seat-assignment-title">Seat Assignment</h3>
+              <button id="seat-assignment-close" type="button" class="button-ghost">Close</button>
+            </div>
+
+            <div class="seat-assignment-grid">
+              <form id="seat-select-existing-form" class="seat-assignment-form">
+                <h4>Choose Existing Bot</h4>
+                <label class="field-label" for="seat-existing-bot-id">My Bots</label>
+                <select id="seat-existing-bot-id" name="bot_id"></select>
+                <button id="seat-select-existing-submit" type="submit">Seat Selected Bot</button>
+              </form>
+
+              <form id="seat-create-new-form" class="seat-assignment-form">
+                <h4>Create New Bot</h4>
+                <label class="field-label" for="seat-new-name">Bot Name</label>
+                <input id="seat-new-name" name="name" type="text" maxlength="120" required />
+                <label class="field-label" for="seat-new-version">Version</label>
+                <input id="seat-new-version" name="version" type="text" maxlength="64" required />
+                <label class="field-label" for="seat-new-file">Bot Package (.zip)</label>
+                <input id="seat-new-file" name="bot_file" type="file" accept=".zip" required />
+                <button id="seat-create-new-submit" type="submit">Create and Seat</button>
+              </form>
+            </div>
+
+            <p id="seat-assignment-feedback" class="seat-assignment-feedback hidden"></p>
           </section>
 
           <section class="match-controls">

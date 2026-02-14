@@ -2,8 +2,12 @@ import math
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
+from pydantic import BaseModel, Field
 
+from app.auth.config import AuthSettings
+from app.auth.service import AuthError, AuthLockedError, AuthService
+from app.auth.store import AuthStore
 from app.bots.loader import BotLoadError, save_upload
 from app.bots.security import MAX_UPLOAD_BYTES
 from app.bots.validator import validate_bot_archive
@@ -17,12 +21,99 @@ repo_root = Path(__file__).resolve().parents[3]
 uploads_dir = repo_root / "runtime" / "uploads"
 uploads_dir.mkdir(parents=True, exist_ok=True)
 
+auth_settings = AuthSettings.from_env(repo_root=repo_root)
+auth_service = AuthService(store=AuthStore(auth_settings.db_path), settings=auth_settings)
 match_service = MatchService(hand_store=HandStore())
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=1024)
+
+
+def require_authenticated_user(request: Request) -> dict:
+    session_id = request.cookies.get(auth_settings.session_cookie_name)
+    user = auth_service.get_user_from_session(session_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user
 
 
 @router.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@router.post("/auth/login")
+def login(payload: LoginRequest, response: Response) -> dict:
+    try:
+        user, session = auth_service.login(username=payload.username, password=payload.password)
+    except AuthLockedError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": "Too many failed login attempts",
+                "retry_after_seconds": exc.retry_after_seconds,
+            },
+        ) from exc
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+    response.set_cookie(
+        key=auth_settings.session_cookie_name,
+        value=session["session_id"],
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=auth_settings.session_ttl_seconds,
+        path="/",
+    )
+    return {"user": user}
+
+
+@router.post("/auth/logout")
+def logout(request: Request, response: Response) -> dict:
+    session_id = request.cookies.get(auth_settings.session_cookie_name)
+    auth_service.logout(session_id)
+    response.delete_cookie(key=auth_settings.session_cookie_name, path="/")
+    return {"ok": True}
+
+
+@router.get("/auth/me")
+def me(current_user: dict = Depends(require_authenticated_user)) -> dict:
+    return {"user": current_user}
+
+
+@router.get("/my/bots")
+def list_my_bots(current_user: dict = Depends(require_authenticated_user)) -> dict:
+    return {"bots": [], "user": current_user}
+
+
+@router.get("/lobby/tables")
+def list_lobby_tables(current_user: dict = Depends(require_authenticated_user)) -> dict:
+    return {"tables": [], "user": current_user}
+
+
+@router.post("/lobby/tables")
+def create_lobby_table(current_user: dict = Depends(require_authenticated_user)) -> dict:
+    raise HTTPException(status_code=501, detail="Lobby table creation is not implemented yet")
+
+
+@router.get("/lobby/leaderboard")
+def get_lobby_leaderboard(current_user: dict = Depends(require_authenticated_user)) -> dict:
+    return {"leaderboard": [], "user": current_user}
+
+
+@router.post("/tables/{table_id}/seats/{seat_id}/bot-select")
+def select_bot_for_seat(
+    table_id: str,
+    seat_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    normalized_seat = seat_id.upper()
+    if normalized_seat not in {"A", "B"}:
+        raise HTTPException(status_code=400, detail="seat_id must be A or B")
+    raise HTTPException(status_code=501, detail="Seat bot selection is not implemented yet")
 
 
 @router.get("/seats")

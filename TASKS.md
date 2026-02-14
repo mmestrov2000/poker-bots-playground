@@ -100,3 +100,169 @@ Goal: keep Hand Detail stable until a user selects a different hand.
 - [x] `BF-T2` Clear Hand Detail on match reset or bot re-upload (owner: `feature-agent`)
   - Acceptance: Reset/re-upload returns Hand Detail to the empty prompt and clears selection.
   - Test Strategy: Manual UI check after reset and re-upload.
+
+## Milestone 4: Auth, Header Navigation, and My Bots
+Goal: add authenticated user flow and owned bot management UX.
+
+- [ ] `M4-T1` Finalize auth/session decisions and document constraints (owner: `main-agent`)
+  - Subtasks:
+  - Confirm local auth vs OAuth for this batch.
+  - Confirm session model (cookie vs token) and protected route policy.
+  - Record decisions in `PROJECT_SPEC.md` and `ARCHITECTURE.md`.
+  - Acceptance: Auth decisions are explicit and unambiguous for implementation.
+  - Test Strategy: Doc review checklist and architecture/spec consistency pass.
+- [ ] `M4-T2` Implement backend auth endpoints and protected-route dependency (owner: `feature-agent`)
+  - Subtasks:
+  - Add `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`.
+  - Add persistent user storage and password/session handling.
+  - Enforce auth dependency on My Bots, Lobby, and seat-selection endpoints.
+  - Acceptance: Unauthenticated requests to protected endpoints are rejected; login session enables access.
+  - Test Strategy: Backend integration tests for login, auth guard, and logout invalidation.
+- [ ] `M4-T3` Implement frontend login page, protected app shell, and header menu (owner: `feature-agent`)
+  - Subtasks:
+  - Add login UI with validation and error handling.
+  - Add shared authenticated header with `Lobby`, `My Bots`, and `Logout`.
+  - Add route guard/redirect behavior for protected pages.
+  - Acceptance: Protected pages are accessible only after login, with visible header navigation.
+  - Test Strategy: Frontend smoke tests for redirect/login/logout/navigation flows.
+- [ ] `M4-T4` Implement backend My Bots catalog APIs and artifact metadata storage (owner: `feature-agent`)
+  - Subtasks:
+  - Add `GET /api/v1/my/bots` and `POST /api/v1/my/bots`.
+  - Persist bot ownership, metadata (`bot_id`, name, version, created_at), and artifact path.
+  - Enforce ownership checks on bot listing and selection.
+  - Acceptance: User sees only owned bots with stable metadata and upload validation feedback.
+  - Test Strategy: Integration tests for list/upload authorization and invalid payloads.
+- [ ] `M4-T5` Build My Bots frontend page with bot cards and upload flow (owner: `feature-agent`)
+  - Subtasks:
+  - Add list UI with bot container cards and required fields (`bot_id`, name, timestamps/status).
+  - Add upload interaction and result states.
+  - Add empty/loading/error states.
+  - Acceptance: User can upload and then see bot card rendered with persisted metadata.
+  - Test Strategy: Manual UI scenario test plus scripted frontend smoke checks.
+- [ ] `M4-T6` Add seat flow support for selecting existing bot or inline upload (owner: `feature-agent`)
+  - Subtasks:
+  - Add `POST /api/v1/tables/{table_id}/seats/{seat_id}/bot-select`.
+  - Update seat UI to choose from owned bots or upload directly.
+  - Keep compatibility with existing match-start behavior.
+  - Acceptance: Seating works through either select-existing or inline-upload without regressions.
+  - Test Strategy: Integration tests for both seat paths and match start trigger.
+- [ ] `M4-T7` Add test coverage for auth and bot-management flows (owner: `test-agent`)
+  - Subtasks:
+  - Add backend tests for auth/session lifecycle and My Bots ownership boundaries.
+  - Add regression tests for seat select/upload branch behavior.
+  - Add minimal frontend flow test coverage for login + My Bots.
+  - Acceptance: New tests fail on auth/ownership regressions and pass on compliant behavior.
+  - Test Strategy: Run backend `pytest` and selected frontend smoke tests in CI.
+- [ ] `M4-T8` Review Milestone 4 changes for security and regression risk (owner: `review-agent`)
+  - Subtasks:
+  - Verify auth guard coverage and session invalidation behavior.
+  - Verify ownership enforcement for all bot read/write/select paths.
+  - Check backward compatibility of existing seat/match APIs.
+  - Acceptance: No unresolved high-severity auth/ownership issues remain.
+  - Test Strategy: Review checklist plus targeted endpoint retests.
+
+## Milestone 5: Bot Isolation and Protocol v2
+Goal: run bots in stronger isolation while providing complete table/player/action context.
+
+- [ ] `M5-T1` Define protocol-v2 bot context schema and compatibility contract (owner: `main-agent`)
+  - Subtasks:
+  - Specify required context fields: player ids, seat map, stacks, pot, board, legal actions, prior actions.
+  - Define versioning and backward compatibility behavior for legacy bots.
+  - Document context size/timeout constraints.
+  - Acceptance: Protocol schema is precise enough for backend and bot-template implementation.
+  - Test Strategy: Schema review against existing bot contract and engine state availability.
+- [ ] `M5-T2` Implement protocol adapter in backend bot runner path (owner: `feature-agent`)
+  - Subtasks:
+  - Map engine state to protocol-v2 structure for each decision.
+  - Include full action timeline needed for opponent tracking.
+  - Add protocol version in request payload to bot runtime.
+  - Acceptance: Bots receive deterministic, complete context payload for every decision call.
+  - Test Strategy: Unit tests for serializer completeness and field-level validation.
+- [ ] `M5-T3` Implement isolated bot runtime supervisor with resource guards (owner: `feature-agent`)
+  - Subtasks:
+  - Execute bot code outside API process boundary.
+  - Enforce timeout, memory, and failure containment policies.
+  - Return normalized fallback action on runtime failure.
+  - Acceptance: Bot crashes/timeouts are isolated and do not terminate API/match service.
+  - Test Strategy: Integration tests with crashing, hanging, and malformed bots.
+- [ ] `M5-T4` Update `bot_template/` for protocol-v2 usage guidance (owner: `feature-agent`)
+  - Subtasks:
+  - Update template contract docs and sample bot parser for new context fields.
+  - Add examples for tracking opponent ids/actions from payload.
+  - Document optional bot-local persistence expectations and limits.
+  - Acceptance: Template lets developers build bots that can track all players and actions.
+  - Test Strategy: Template smoke run with a sample hand context fixture.
+- [ ] `M5-T5` Add dedicated isolation/protocol regression tests (owner: `test-agent`)
+  - Subtasks:
+  - Add tests for protocol completeness and stable field semantics.
+  - Add tests for isolation guarantees under bot failures.
+  - Add performance sanity checks for decision-call latency budget.
+  - Acceptance: Regressions in protocol fields or isolation behavior are caught by automated tests.
+  - Test Strategy: Backend `pytest` suite extensions with negative and stress-oriented fixtures.
+- [ ] `M5-T6` Review Milestone 5 for sandbox and compatibility risks (owner: `review-agent`)
+  - Subtasks:
+  - Validate isolation boundary and guardrail enforcement paths.
+  - Validate legacy bot fallback/compatibility behavior.
+  - Validate protocol docs match runtime implementation.
+  - Acceptance: No unresolved critical isolation/security issues remain.
+  - Test Strategy: Review-driven targeted rerun of isolation and protocol tests.
+
+## Milestone 6: Lobby, Multi-Table UX, and Persistent Leaderboard
+Goal: replace single-table home with lobby + table pages and add persistent historical leaderboard.
+
+- [ ] `M6-T1` Introduce persistent storage models/migrations for lobby and leaderboard entities (owner: `feature-agent`)
+  - Subtasks:
+  - Add persistent models for users, bots, tables, and leaderboard aggregates.
+  - Add migration/bootstrap path for local/dev environments.
+  - Keep compatibility with existing runtime hand history files.
+  - Acceptance: Data survives process restarts and schema is reproducible in clean setup.
+  - Test Strategy: Persistence integration test across app restart.
+- [ ] `M6-T2` Implement lobby table list/create backend APIs (owner: `feature-agent`)
+  - Subtasks:
+  - Add `GET /api/v1/lobby/tables` and `POST /api/v1/lobby/tables`.
+  - Return required table metadata for list rendering.
+  - Enforce auth and input validation for creation flow.
+  - Acceptance: Users can create tables and retrieve consistent lobby listings.
+  - Test Strategy: API integration tests for create/list success and validation failures.
+- [ ] `M6-T3` Implement leaderboard aggregation and read API (owner: `feature-agent`)
+  - Subtasks:
+  - Compute and persist `bb_won`, `hands_played`, and `bb/hand` per bot.
+  - Update aggregates after each completed hand.
+  - Add `GET /api/v1/lobby/leaderboard` sorted by `bb/hand`.
+  - Acceptance: Leaderboard includes all historical participants with stable metrics.
+  - Test Strategy: Integration tests for aggregate updates and ordering.
+- [ ] `M6-T4` Build Lobby frontend page with table list/create and leaderboard (owner: `feature-agent`)
+  - Subtasks:
+  - Replace current main page with lobby list and create-table controls.
+  - Add leaderboard panel with persistent bot rankings.
+  - Add navigation from lobby rows to table detail page.
+  - Acceptance: Lobby is default authenticated landing page with functional list/create/leaderboard.
+  - Test Strategy: Frontend smoke test for list/create/navigation flows.
+- [ ] `M6-T5` Implement table detail routing with existing live table experience (owner: `feature-agent`)
+  - Subtasks:
+  - Move current table UI into table-detail route/page.
+  - Keep live hand summary, chart, and history interactions.
+  - Ensure table route is keyed by `table_id`.
+  - Acceptance: Opening a table from lobby shows existing gameplay panels for that table.
+  - Test Strategy: Manual table route validation and API-driven smoke checks.
+- [ ] `M6-T6` Add regression and edge-case tests for lobby/table/leaderboard flows (owner: `test-agent`)
+  - Subtasks:
+  - Add backend tests for multi-table lifecycle and scoreboard persistence.
+  - Add tests for leaderboard with zero-hand and high-volume edge cases.
+  - Add UI checks for table navigation and stale data handling.
+  - Acceptance: Multi-table and leaderboard regressions are detected automatically.
+  - Test Strategy: Extended backend `pytest` + frontend smoke suite in CI.
+- [ ] `M6-T7` Review Milestone 6 for data consistency and UX regressions (owner: `review-agent`)
+  - Subtasks:
+  - Validate multi-table data isolation and routing correctness.
+  - Validate leaderboard metric correctness and sorting semantics.
+  - Validate no regressions in table gameplay/hand history behavior.
+  - Acceptance: No unresolved high-severity consistency or regression issues remain.
+  - Test Strategy: Review checklist plus targeted rerun of affected tests.
+- [ ] `M6-T8` Run release readiness checks for Batch 2 scope (owner: `release-agent`)
+  - Subtasks:
+  - Run full repository validation and test suite.
+  - Verify documentation and environment instructions match implemented behavior.
+  - Summarize release blockers, residual risks, and deployment notes.
+  - Acceptance: Batch 2 readiness report is published with clear go/no-go decision.
+  - Test Strategy: End-to-end CI and local release checklist execution.

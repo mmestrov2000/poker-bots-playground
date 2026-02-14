@@ -47,6 +47,10 @@ docker compose up --build
 
 Open `http://localhost:8000`.
 
+Auth persistence:
+- Registered users are stored in `runtime/auth.sqlite3`.
+- `docker-compose.yml` mounts `./runtime` into the container, so accounts persist across app restarts.
+
 ### Asset Versioning (Production)
 Set `APP_ASSET_VERSION` per deployment (for example to a git SHA or release tag) so browsers load new JS/CSS after deploy:
 

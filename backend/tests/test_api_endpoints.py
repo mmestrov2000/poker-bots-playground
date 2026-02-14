@@ -1,4 +1,5 @@
 import io
+import stat
 import time
 import zipfile
 from datetime import datetime, timezone
@@ -493,3 +494,50 @@ def test_auth_cookie_secure_flag_is_enabled_for_forwarded_https():
     )
     morsel = extract_cookie_morsel(response)
     assert bool(morsel["secure"])
+
+
+def test_registered_users_persist_across_auth_service_restart(tmp_path):
+    db_path = tmp_path / "auth.sqlite3"
+    settings = AuthSettings(
+        session_cookie_name="ppg_session",
+        session_cookie_secure=None,
+        session_ttl_seconds=3600,
+        login_max_failures=3,
+        login_lockout_seconds=60,
+        login_failure_window_seconds=300,
+        bootstrap_username="bootstrap",
+        bootstrap_password="bootstrap-password",
+        db_path=db_path,
+    )
+
+    first_service = AuthService(store=AuthStore(db_path), settings=settings)
+    first_service.register(username="durable-user", password="super-long-password")
+
+    restarted_service = AuthService(store=AuthStore(db_path), settings=settings)
+    user, _session = restarted_service.login(
+        username="durable-user",
+        password="super-long-password",
+    )
+    assert user["username"] == "durable-user"
+
+
+def test_auth_database_file_permissions_are_restricted(tmp_path):
+    db_path = tmp_path / "auth.sqlite3"
+    settings = AuthSettings(
+        session_cookie_name="ppg_session",
+        session_cookie_secure=None,
+        session_ttl_seconds=3600,
+        login_max_failures=3,
+        login_lockout_seconds=60,
+        login_failure_window_seconds=300,
+        bootstrap_username="bootstrap",
+        bootstrap_password="bootstrap-password",
+        db_path=db_path,
+    )
+
+    service = AuthService(store=AuthStore(db_path), settings=settings)
+    service.register(username="perm-user", password="another-long-password")
+
+    # db file is created immediately; wal/shm are optional depending on sqlite behavior.
+    db_mode = stat.S_IMODE(db_path.stat().st_mode)
+    assert db_mode == 0o600

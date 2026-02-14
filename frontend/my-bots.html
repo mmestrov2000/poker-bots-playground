@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Bots | Poker Bots Playground</title>
+    <link rel="stylesheet" href="/static/styles.css?v=__ASSET_VERSION__" />
+  </head>
+  <body data-page="my-bots">
+    <main id="app-shell" class="layout" aria-live="polite">
+      <header class="app-header">
+        <div class="app-brand">
+          <h1>Poker Bots Playground</h1>
+          <p>6-max No-Limit Texas Hold'em bot battle.</p>
+        </div>
+        <nav class="app-nav" aria-label="Primary">
+          <a id="nav-lobby" data-nav="lobby" href="/lobby">Lobby</a>
+          <a id="nav-my-bots" data-nav="my-bots" href="/my-bots">My Bots</a>
+          <button id="logout-button" type="button" class="button-ghost">Logout</button>
+        </nav>
+      </header>
+
+      <p id="auth-user" class="auth-user"></p>
+
+      <section class="my-bots-page">
+        <header class="my-bots-header">
+          <h2>My Bots</h2>
+          <p>Manage your uploaded bots for table seating.</p>
+        </header>
+        <div id="my-bots-state" class="my-bots-state">Loading bots...</div>
+        <ul id="my-bots-list" class="my-bots-list hidden"></ul>
+      </section>
+    </main>
+
+    <script src="/static/app-shell.js?v=__ASSET_VERSION__" defer></script>
+    <script src="/static/my-bots.js?v=__ASSET_VERSION__" defer></script>
+  </body>
+</html>

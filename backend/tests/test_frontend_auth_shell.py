@@ -61,25 +61,31 @@ def extract_session_cookie(response: Response) -> str:
     return morsel.value
 
 
-def test_frontend_shell_has_login_auth_header_and_lobby_routes():
-    frontend_index = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
-    html = frontend_index.read_text(encoding="utf-8")
+def test_frontend_pages_split_login_lobby_and_my_bots():
+    frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+    login_html = (frontend_dir / "login.html").read_text(encoding="utf-8")
+    lobby_html = (frontend_dir / "lobby.html").read_text(encoding="utf-8")
+    my_bots_html = (frontend_dir / "my-bots.html").read_text(encoding="utf-8")
 
-    assert 'id="login-form"' in html
-    assert 'id="auth-mode-login"' in html
-    assert 'id="auth-mode-register"' in html
-    assert 'id="nav-lobby"' in html
-    assert 'id="nav-my-bots"' in html
-    assert 'id="logout-button"' in html
-    assert 'href="#/lobby"' in html
-    assert 'href="#/my-bots"' in html
-    assert 'id="page-lobby"' in html
-    assert 'id="page-my-bots"' in html
+    assert 'id="auth-form"' in login_html
+    assert 'id="auth-mode-login"' in login_html
+    assert 'id="auth-mode-register"' in login_html
+    assert "/static/login.js" in login_html
 
-    # Existing table UX controls remain available under Lobby.
-    assert 'id="seat-1-take"' in html
-    assert 'id="seat-6-take"' in html
-    assert 'id="start-match"' in html
+    assert 'id="nav-lobby"' in lobby_html
+    assert 'id="nav-my-bots"' in lobby_html
+    assert 'id="logout-button"' in lobby_html
+    assert 'href="/lobby"' in lobby_html
+    assert 'href="/my-bots"' in lobby_html
+    assert "/static/lobby.js" in lobby_html
+
+    # Existing table UX controls remain available on the Lobby page.
+    assert 'id="seat-1-take"' in lobby_html
+    assert 'id="seat-6-take"' in lobby_html
+    assert 'id="start-match"' in lobby_html
+
+    assert 'id="my-bots-list"' in my_bots_html
+    assert "/static/my-bots.js" in my_bots_html
 
 
 def test_frontend_route_guard_login_logout_navigation_smoke():

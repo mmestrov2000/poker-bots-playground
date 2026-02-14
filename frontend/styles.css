@@ -104,11 +104,13 @@ button:disabled {
   font-size: 0.92rem;
 }
 
+#auth-form,
 #login-form {
   display: grid;
   gap: 0.45rem;
 }
 
+#auth-form input,
 #login-form input {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -116,6 +118,7 @@ button:disabled {
   background: #fff;
 }
 
+#auth-form input:focus,
 #login-form input:focus {
   outline: 2px solid rgba(31, 106, 79, 0.25);
   border-color: var(--accent);

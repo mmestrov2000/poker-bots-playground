@@ -4,6 +4,7 @@ import ast
 import io
 import zipfile
 
+from app.bots.protocol import extract_declared_protocol_from_ast
 from app.bots.security import MAX_BOT_SOURCE_BYTES, validate_archive_infos
 
 
@@ -44,6 +45,10 @@ def validate_bot_archive(payload: bytes) -> tuple[bool, str | None]:
     )
     if not has_bot_class:
         return False, "bot.py must define a PokerBot class"
+
+    _, _, protocol_error = extract_declared_protocol_from_ast(tree)
+    if protocol_error:
+        return False, protocol_error
 
     return True, None
 

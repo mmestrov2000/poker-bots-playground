@@ -5,6 +5,8 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 from typing import Any
 
+from app.bots.protocol import LEGACY_PROTOCOL_VERSION
+
 
 _EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="bot-runner")
 MAX_STATE_BYTES = 64 * 1024
@@ -15,6 +17,7 @@ class BotRunner:
     bot: Any
     seat_id: str
     timeout_seconds: float = 2.0
+    protocol_version: str = LEGACY_PROTOCOL_VERSION
 
     def act(self, state: dict) -> dict:
         try:

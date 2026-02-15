@@ -212,7 +212,7 @@ Goal: run bots in stronger isolation while providing complete table/player/actio
   - Document context size/timeout constraints. Done: `64KiB` serialized payload cap and `2.0s` decision timeout documented.
   - Acceptance: Protocol schema is precise enough for backend and bot-template implementation.
   - Test Strategy: Schema review against existing bot contract and engine state availability.
-- [ ] `M5-T2` Implement protocol adapter in backend bot runner path (owner: `feature-agent`)
+- [x] `M5-T2` Implement protocol adapter in backend bot runner path (owner: `feature-agent`)
   - Subtasks:
   - Map engine state to protocol-v2 structure for each decision.
   - Include full action timeline needed for opponent tracking.

@@ -5,6 +5,7 @@ from threading import Event, Lock, Thread, current_thread
 from typing import Literal
 
 from app.bots.loader import load_bot_from_zip
+from app.bots.protocol import resolve_bot_protocol
 from app.bots.runtime import BotRunner
 from app.engine.game import PokerEngine, SeatId, SEAT_ORDER, order_seats
 from app.engine.hand_history import format_hand_history
@@ -145,7 +146,11 @@ class MatchService:
         with self._lock:
             if bot_path is not None:
                 bot_instance = load_bot_from_zip(bot_path)
-                self._bots[seat_id] = BotRunner(bot=bot_instance, seat_id=seat_id)
+                self._bots[seat_id] = BotRunner(
+                    bot=bot_instance,
+                    seat_id=seat_id,
+                    protocol_version=resolve_bot_protocol(bot_instance),
+                )
             seat = self._seats[seat_id]
             seat.ready = True
             seat.bot_name = bot_name

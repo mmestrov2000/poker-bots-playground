@@ -6,6 +6,7 @@ from pathlib import Path
 from types import ModuleType
 from uuid import uuid4
 
+from app.bots.protocol import normalize_protocol_value
 from app.bots.security import extract_archive_safely
 
 
@@ -49,6 +50,16 @@ def load_bot_from_zip(zip_path: Path) -> object:
     bot_instance = bot_cls()
     if not hasattr(bot_instance, "act"):
         raise BotLoadError("PokerBot.act missing")
+    setattr(
+        bot_instance,
+        "_ppg_module_protocol_version",
+        normalize_protocol_value(getattr(module, "BOT_PROTOCOL_VERSION", None)),
+    )
+    setattr(
+        bot_instance,
+        "_ppg_class_protocol_version",
+        normalize_protocol_value(getattr(bot_cls, "protocol_version", None)),
+    )
 
     return bot_instance
 

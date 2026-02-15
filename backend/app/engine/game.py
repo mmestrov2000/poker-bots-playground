@@ -5,6 +5,7 @@ from itertools import combinations
 from random import Random, SystemRandom
 from typing import Iterable, Literal
 
+from app.bots.protocol import build_decision_state
 from app.bots.runtime import BotRunner
 
 
@@ -86,6 +87,7 @@ class PokerEngine:
         bots: dict[SeatId, BotRunner],
         seat_names: dict[SeatId, str],
         button: SeatId,
+        table_id: str = "table-1",
     ) -> HandResult:
         active_seats = order_seats(bots.keys())
         if len(active_seats) < 2:
@@ -134,6 +136,8 @@ class PokerEngine:
 
         pot_ref = [pot]
         folded_winner = self._run_betting_round(
+            hand_id=hand_id,
+            table_id=table_id,
             street="preflop",
             starting_seat=preflop_start,
             order=active_seats,
@@ -196,6 +200,8 @@ class PokerEngine:
         board.extend([deck.pop(), deck.pop(), deck.pop()])
         pot_ref = [pot]
         folded_winner = self._run_betting_round(
+            hand_id=hand_id,
+            table_id=table_id,
             street="flop",
             starting_seat=postflop_start,
             order=active_seats,
@@ -258,6 +264,8 @@ class PokerEngine:
         board.append(deck.pop())
         pot_ref = [pot]
         folded_winner = self._run_betting_round(
+            hand_id=hand_id,
+            table_id=table_id,
             street="turn",
             starting_seat=postflop_start,
             order=active_seats,
@@ -320,6 +328,8 @@ class PokerEngine:
         board.append(deck.pop())
         pot_ref = [pot]
         folded_winner = self._run_betting_round(
+            hand_id=hand_id,
+            table_id=table_id,
             street="river",
             starting_seat=postflop_start,
             order=active_seats,
@@ -403,6 +413,8 @@ class PokerEngine:
     def _run_betting_round(
         self,
         *,
+        hand_id: str,
+        table_id: str,
         street: str,
         starting_seat: SeatId,
         order: list[SeatId],
@@ -437,7 +449,10 @@ class PokerEngine:
 
             to_call = current_bet_ref[0] - bets[seat]
             legal = legal_actions(to_call=to_call, stack=stacks[seat], current_bet=current_bet_ref[0])
-            state = build_bot_state(
+            state = build_decision_state(
+                protocol_version=bots[seat].protocol_version,
+                table_id=table_id,
+                hand_id=hand_id,
                 seat=seat,
                 street=street,
                 hole_cards=hole_cards[seat],
@@ -456,6 +471,9 @@ class PokerEngine:
                 button=button,
                 small_blind=small_blind,
                 big_blind=big_blind,
+                small_blind_amount=self.small_blind_cents,
+                big_blind_amount=self.big_blind_cents,
+                actions=actions,
             )
             raw_action = bots[seat].act(state)
             action, amount = normalize_action(
@@ -778,51 +796,3 @@ def evaluate_five_card_hand(cards: Iterable[Card]) -> tuple:
         return (1, [ordered_ranks[0]] + kickers)
     return (0, ranks)
 
-
-def build_bot_state(
-    *,
-    seat: SeatId,
-    street: str,
-    hole_cards: list[Card],
-    board: list[Card],
-    pot: int,
-    stack: int,
-    to_call: int,
-    min_raise_to: int,
-    legal_actions: list[str],
-    seat_name: str,
-    seats: list[SeatId],
-    seat_names: dict[SeatId, str],
-    stacks: dict[SeatId, int],
-    bets: dict[SeatId, int],
-    folded: set[SeatId],
-    button: SeatId,
-    small_blind: SeatId,
-    big_blind: SeatId,
-) -> dict:
-    return {
-        "seat": seat,
-        "seat_name": seat_name,
-        "street": street,
-        "hole_cards": [str(card) for card in hole_cards],
-        "board": [str(card) for card in board],
-        "pot": pot,
-        "stack": stack,
-        "to_call": to_call,
-        "min_raise_to": min_raise_to,
-        "legal_actions": legal_actions,
-        "players": [
-            {
-                "seat": seat_id,
-                "name": seat_names[seat_id],
-                "stack": stacks[seat_id],
-                "bet": bets[seat_id],
-                "folded": seat_id in folded,
-                "all_in": stacks[seat_id] == 0,
-            }
-            for seat_id in seats
-        ],
-        "button": button,
-        "small_blind": small_blind,
-        "big_blind": big_blind,
-    }

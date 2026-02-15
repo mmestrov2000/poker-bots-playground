@@ -66,6 +66,7 @@ def load_bot_from_zip(zip_path: Path) -> object:
         "_ppg_class_protocol_version",
         normalize_protocol_value(getattr(bot_cls, "protocol_version", None)),
     )
+    setattr(bot_instance, "_ppg_extract_dir", str(extract_dir))
 
     return bot_instance
 

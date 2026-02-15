@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 import zipfile
 from pathlib import Path
@@ -204,3 +205,47 @@ def test_bot_runner_subprocess_timeout(tmp_path: Path) -> None:
     result = runner.act({"legal_actions": ["check"]})
     assert result["action"] == "fold"
     assert result.get("error") == "timeout"
+
+
+def test_bot_runner_subprocess_does_not_inherit_host_env(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("PPG_TEST_SECRET_TOKEN", "top-secret")
+    env_body = "\n".join(
+        [
+            "import os",
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        if os.getenv('PPG_TEST_SECRET_TOKEN'):",
+            "            return {'action': 'raise', 'amount': 500}",
+            "        return {'action': 'check'}",
+        ]
+    )
+    zip_path = _zip_bot(tmp_path, "env.zip", env_body)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.2,
+    )
+    result = runner.act({"legal_actions": ["check", "raise"]})
+    assert result["action"] == "check"
+    assert "PPG_TEST_SECRET_TOKEN" in os.environ
+
+
+def test_bot_runner_subprocess_cleans_unpack_directories(tmp_path: Path) -> None:
+    body = "\n".join(
+        [
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        return {'action': 'check'}",
+        ]
+    )
+    zip_path = _zip_bot(tmp_path, "clean.zip", body)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.2,
+    )
+    result = runner.act({"legal_actions": ["check"]})
+    assert result["action"] == "check"
+    assert list(tmp_path.glob("unpacked_*")) == []

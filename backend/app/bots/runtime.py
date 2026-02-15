@@ -119,12 +119,20 @@ def _fallback(error: str) -> dict:
 
 
 def _sandbox_env() -> dict[str, str]:
-    env = os.environ.copy()
+    inherited = os.environ
     backend_dir = str(Path(__file__).resolve().parents[2])
-    pythonpath = env.get("PYTHONPATH")
-    env["PYTHONPATH"] = (
+    pythonpath = inherited.get("PYTHONPATH")
+    sandbox_env: dict[str, str] = {}
+    sandbox_env["PYTHONPATH"] = (
         f"{backend_dir}{os.pathsep}{pythonpath}"
         if pythonpath
         else backend_dir
     )
-    return env
+    # Keep subprocess environment minimal to avoid leaking host secrets to bot code.
+    if inherited.get("PATH"):
+        sandbox_env["PATH"] = inherited["PATH"]
+    for key in ("LANG", "LC_ALL", "LC_CTYPE", "TZ"):
+        if inherited.get(key):
+            sandbox_env[key] = inherited[key]
+    sandbox_env["PYTHONNOUSERSITE"] = "1"
+    return sandbox_env

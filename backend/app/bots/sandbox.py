@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -40,14 +41,21 @@ def _set_resource_limits(memory_limit_bytes: int, cpu_seconds: int) -> None:
 
 
 def _run(bot_zip: Path, state: dict[str, Any]) -> dict[str, Any]:
+    extract_dir: str | None = None
     try:
         bot = load_bot_from_zip(bot_zip)
+        extract_path = getattr(bot, "_ppg_extract_dir", None)
+        if isinstance(extract_path, str):
+            extract_dir = extract_path
         result = bot.act(state)
         return {"result": result}
     except BotLoadError as exc:
         return {"error": f"load_error:{exc}"}
     except BaseException as exc:  # noqa: BLE001 - sandbox contains arbitrary bot failures
         return {"error": f"runtime_error:{exc.__class__.__name__}"}
+    finally:
+        if extract_dir:
+            shutil.rmtree(extract_dir, ignore_errors=True)
 
 
 def main() -> int:

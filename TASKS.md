@@ -240,11 +240,11 @@ Goal: run bots in stronger isolation while providing complete table/player/actio
   - Add performance sanity checks for decision-call latency budget.
   - Acceptance: Regressions in protocol fields or isolation behavior are caught by automated tests.
   - Test Strategy: Backend `pytest` suite extensions with negative and stress-oriented fixtures.
-- [ ] `M5-T6` Review Milestone 5 for sandbox and compatibility risks (owner: `review-agent`)
+- [x] `M5-T6` Review Milestone 5 for sandbox and compatibility risks (owner: `review-agent`)
   - Subtasks:
-  - Validate isolation boundary and guardrail enforcement paths.
-  - Validate legacy bot fallback/compatibility behavior.
-  - Validate protocol docs match runtime implementation.
+  - Validate isolation boundary and guardrail enforcement paths. Done: reviewed `BotRunner`/sandbox flow and fixed env-leak + extract-dir cleanup regressions.
+  - Validate legacy bot fallback/compatibility behavior. Done: verified protocol selection and fallback behavior across `backend/app/bots/protocol.py` and existing adapter/runtime tests.
+  - Validate protocol docs match runtime implementation. Done: compared `PROJECT_SPEC.md`, `ARCHITECTURE.md`, template docs, and runtime payload generation/tests.
   - Acceptance: No unresolved critical isolation/security issues remain.
   - Test Strategy: Review-driven targeted rerun of isolation and protocol tests.
 

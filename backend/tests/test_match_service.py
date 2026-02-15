@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
 
+import pytest
+
 from app.services.match_service import HandRecord, MatchService
 from app.storage.hand_store import HandStore
 
@@ -247,6 +249,69 @@ def test_list_pnl_returns_deltas_and_last_hand_id(tmp_path: Path) -> None:
             },
         },
     ]
+
+
+@pytest.mark.parametrize(
+    "bot_body",
+    [
+        "\n".join(
+            [
+                "class PokerBot:",
+                "    def act(self, state):",
+                "        raise SystemExit(2)",
+            ]
+        ),
+        "\n".join(
+            [
+                "import time",
+                "class PokerBot:",
+                "    def act(self, state):",
+                "        time.sleep(10)",
+                "        return {'action': 'check'}",
+            ]
+        ),
+        "\n".join(
+            [
+                "class PokerBot:",
+                "    def act(self, state):",
+                "        return 'not-a-dict'",
+            ]
+        ),
+    ],
+)
+def test_runtime_supervisor_contains_bad_bots(tmp_path: Path, bot_body: str) -> None:
+    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    service.HAND_INTERVAL_SECONDS = 0.01
+
+    stable_bot = "\n".join(
+        [
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        if 'check' in state.get('legal_actions', []):",
+            "            return {'action': 'check'}",
+            "        if 'call' in state.get('legal_actions', []):",
+            "            return {'action': 'call'}",
+            "        return {'action': 'fold'}",
+        ]
+    )
+    bot_a = _write_bot_zip(tmp_path, "stable.zip", stable_bot)
+    bot_b = _write_bot_zip(tmp_path, "bad.zip", bot_body)
+
+    service.register_bot("1", "stable.zip", bot_path=bot_a)
+    service.register_bot("2", "bad.zip", bot_path=bot_b)
+    with service._lock:
+        assert service._bots["2"] is not None
+        service._bots["2"].timeout_seconds = 0.05
+
+    service.start_match()
+    sleep(0.35)
+    hands = service.list_hands(limit=10)
+    match = service.get_match()
+
+    assert match["status"] == "running"
+    assert hands, "Expected hands even when one bot crashes/hangs/returns malformed output"
+
+    service.end_match()
 
 
 def test_match_loop_runtime_error_stops_match_safely(tmp_path: Path) -> None:

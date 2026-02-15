@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from app.bots.loader import BotLoadError, load_bot_from_zip
+from app.bots.loader import BotLoadError, load_bot_from_zip, resolve_bot_protocol_from_zip
 from app.bots.runtime import MAX_STATE_BYTES, BotRunner
 
 
@@ -83,6 +83,21 @@ def test_load_bot_from_zip_rejects_unsafe_archive_path(tmp_path: Path) -> None:
         load_bot_from_zip(zip_path)
 
 
+def test_resolve_bot_protocol_from_zip_without_importing_bot(tmp_path: Path) -> None:
+    body = "\n".join(
+        [
+            "BOT_PROTOCOL_VERSION = '2.0'",
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        return {'action': 'check'}",
+        ]
+    )
+    zip_path = _zip_bot(tmp_path, "bot.zip", body)
+
+    protocol = resolve_bot_protocol_from_zip(zip_path)
+    assert protocol == "2.0"
+
+
 def test_bot_runner_timeout_and_error() -> None:
     class SlowBot:
         def act(self, state):
@@ -147,3 +162,45 @@ def test_bot_runner_rejects_invalid_state() -> None:
     result = runner.act({"bad": BadString()})
     assert result["action"] == "fold"
     assert result.get("error") == "invalid_state"
+
+
+def test_bot_runner_subprocess_contains_crashing_bot(tmp_path: Path) -> None:
+    crash_body = "\n".join(
+        [
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        raise SystemExit(2)",
+        ]
+    )
+    zip_path = _zip_bot(tmp_path, "crash.zip", crash_body)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.2,
+    )
+    result = runner.act({"legal_actions": ["check"]})
+    assert result["action"] == "fold"
+    assert result.get("error", "").startswith("runtime_error:")
+
+
+def test_bot_runner_subprocess_timeout(tmp_path: Path) -> None:
+    hang_body = "\n".join(
+        [
+            "import time",
+            "class PokerBot:",
+            "    def act(self, state):",
+            "        time.sleep(5)",
+            "        return {'action': 'check'}",
+        ]
+    )
+    zip_path = _zip_bot(tmp_path, "hang.zip", hang_body)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.05,
+    )
+    result = runner.act({"legal_actions": ["check"]})
+    assert result["action"] == "fold"
+    assert result.get("error") == "timeout"

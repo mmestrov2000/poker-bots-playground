@@ -219,7 +219,7 @@ Goal: run bots in stronger isolation while providing complete table/player/actio
   - Add protocol version in request payload to bot runtime.
   - Acceptance: Bots receive deterministic, complete context payload for every decision call.
   - Test Strategy: Unit tests for serializer completeness and field-level validation.
-- [ ] `M5-T3` Implement isolated bot runtime supervisor with resource guards (owner: `feature-agent`)
+- [x] `M5-T3` Implement isolated bot runtime supervisor with resource guards (owner: `feature-agent`)
   - Subtasks:
   - Execute bot code outside API process boundary.
   - Enforce timeout, memory, and failure containment policies.

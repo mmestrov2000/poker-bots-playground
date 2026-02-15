@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import zipfile
 from pathlib import Path
 from types import ModuleType
 from uuid import uuid4
 
-from app.bots.protocol import normalize_protocol_value
+from app.bots.protocol import (
+    extract_declared_protocol_from_ast,
+    normalize_protocol_value,
+    select_runtime_protocol,
+)
 from app.bots.security import extract_archive_safely
+from app.bots.validator import select_bot_member
 
 
 class BotLoadError(RuntimeError):
@@ -62,6 +68,40 @@ def load_bot_from_zip(zip_path: Path) -> object:
     )
 
     return bot_instance
+
+
+def resolve_bot_protocol_from_zip(zip_path: Path) -> str:
+    if not zip_path.exists():
+        raise BotLoadError("bot archive not found")
+    if not zipfile.is_zipfile(zip_path):
+        raise BotLoadError("bot archive is not a valid zip")
+
+    try:
+        with zipfile.ZipFile(zip_path, "r") as archive:
+            bot_member, selection_error = select_bot_member(archive.namelist())
+            if bot_member is None:
+                raise BotLoadError(selection_error or "bot.py must exist at zip root or one top-level folder")
+            with archive.open(bot_member) as bot_file:
+                source = bot_file.read().decode("utf-8")
+    except KeyError as exc:
+        raise BotLoadError("bot.py was not found in the zip") from exc
+    except UnicodeDecodeError as exc:
+        raise BotLoadError("bot.py must be valid UTF-8 text") from exc
+    except zipfile.BadZipFile as exc:
+        raise BotLoadError("bot archive is not a valid zip") from exc
+
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        raise BotLoadError("bot.py contains invalid Python syntax") from exc
+
+    module_protocol, class_protocol, protocol_error = extract_declared_protocol_from_ast(tree)
+    if protocol_error:
+        raise BotLoadError(protocol_error)
+    return select_runtime_protocol(
+        module_protocol=module_protocol,
+        class_protocol=class_protocol,
+    )
 
 
 def _load_module(path: Path) -> ModuleType:

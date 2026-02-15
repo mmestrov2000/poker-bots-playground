@@ -194,6 +194,38 @@ This section defines architectural additions for authentication, bot ownership, 
 - Expose explicit protocol version field in bot context payload.
 - Log per-bot runtime failures without impacting API availability.
 
+## Protocol v2 Architecture Contract (M5-T1 Locked)
+### Adapter Inputs and Outputs
+- Input sources:
+  - table/match metadata from `match_service`
+  - per-street hand state from `engine.game`
+  - per-action timeline from engine `ActionEvent` stream
+- Output target:
+  - versioned payload for `BotRunner.act(state)` where `state` is either legacy v1 or protocol v2.
+
+### v2 Mapping Rules
+- `table.hand_id`, `table.street`, blind values, and button seat map directly from engine round state.
+- `hero` is derived from currently acting seat.
+- `players` includes every active seat in seat-order, with stable `player_id` and current stack/bet/fold/all-in flags.
+- `legal_actions` is normalized from engine legal-action computation, including min/max bounds when action uses amount.
+- `action_history` is built from full hand action timeline in deterministic index order and includes `pot_after` snapshots.
+
+### Compatibility Rules
+- Version selection:
+  - use `BOT_PROTOCOL_VERSION` module constant when present;
+  - otherwise use `PokerBot.protocol_version` class attribute when present;
+  - otherwise default to legacy v1 payload.
+- Unsupported protocol declarations fail validation at upload time.
+- Legacy v1 payload shape must remain unchanged while compatibility mode exists.
+
+### Runtime Limits and Failure Policy
+- Serialized state payload cap: `64KiB` (`65536` bytes).
+- Per-decision timeout: default `2.0s`.
+- If payload generation exceeds limits, bot times out, or bot returns invalid action schema:
+  - record structured error,
+  - substitute safe fallback action,
+  - continue match loop without process crash.
+
 ## M4-T1 Policy Decisions
 - Auth scope: username/password only in Batch 2 (no OAuth provider integration).
 - Session model: server-side session with `HttpOnly` secure cookies.

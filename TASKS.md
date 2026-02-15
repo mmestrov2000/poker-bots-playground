@@ -205,11 +205,11 @@ Goal: add authenticated user flow and owned bot management UX.
 ## Milestone 5: Bot Isolation and Protocol v2
 Goal: run bots in stronger isolation while providing complete table/player/action context.
 
-- [ ] `M5-T1` Define protocol-v2 bot context schema and compatibility contract (owner: `main-agent`)
+- [x] `M5-T1` Define protocol-v2 bot context schema and compatibility contract (owner: `main-agent`)
   - Subtasks:
-  - Specify required context fields: player ids, seat map, stacks, pot, board, legal actions, prior actions.
-  - Define versioning and backward compatibility behavior for legacy bots.
-  - Document context size/timeout constraints.
+  - Specify required context fields: player ids, seat map, stacks, pot, board, legal actions, prior actions. Done in `PROJECT_SPEC.md` (Bot Protocol v2 Contract) and `ARCHITECTURE.md` (Protocol v2 Architecture Contract).
+  - Define versioning and backward compatibility behavior for legacy bots. Done: explicit v2 opt-in (`BOT_PROTOCOL_VERSION` / `PokerBot.protocol_version`), legacy-v1 default, and upload-time rejection for unsupported versions.
+  - Document context size/timeout constraints. Done: `64KiB` serialized payload cap and `2.0s` decision timeout documented.
   - Acceptance: Protocol schema is precise enough for backend and bot-template implementation.
   - Test Strategy: Schema review against existing bot contract and engine state availability.
 - [ ] `M5-T2` Implement protocol adapter in backend bot runner path (owner: `feature-agent`)

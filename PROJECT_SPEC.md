@@ -192,6 +192,79 @@ This section extends MVP scope for the next implementation batch. Existing MVP r
 - `GET /api/v1/lobby/leaderboard`
 - `POST /api/v1/tables/{table_id}/seats/{seat_id}/bot-select`
 
+## Bot Protocol v2 Contract (M5-T1 Locked)
+### Version Negotiation and Compatibility
+- Bot interface remains `PokerBot.act(state: dict) -> dict`.
+- Default protocol is legacy v1 when no explicit protocol declaration exists.
+- Bot opts into v2 by declaring either:
+  - module constant `BOT_PROTOCOL_VERSION = "2.0"`, or
+  - class attribute `PokerBot.protocol_version = "2.0"`.
+- Unsupported protocol values are rejected during upload validation with a clear error.
+- Runtime always sends exactly one schema per call:
+  - v1 bots receive the current legacy `state` shape unchanged.
+  - v2 bots receive the v2 payload described below.
+
+### Required v2 Payload Shape
+All fields below are required unless explicitly marked optional.
+
+- `protocol_version`: `"2.0"`
+- `decision_id`: string, unique per bot decision request
+- `table`: object
+  - `table_id`: string
+  - `hand_id`: string
+  - `street`: `"preflop" | "flop" | "turn" | "river"`
+  - `button_seat`: string
+  - `small_blind`: int (chips, integer units)
+  - `big_blind`: int (chips, integer units)
+- `hero`: object
+  - `player_id`: string
+  - `seat_id`: string
+  - `name`: string
+  - `hole_cards`: list[string]
+  - `stack`: int
+  - `bet`: int
+  - `to_call`: int
+  - `min_raise_to`: int
+  - `max_raise_to`: int
+- `players`: list[object], ordered by seat position
+  - `player_id`: string
+  - `seat_id`: string
+  - `name`: string
+  - `stack`: int
+  - `bet`: int
+  - `folded`: bool
+  - `all_in`: bool
+  - `is_hero`: bool
+- `board`: object
+  - `cards`: list[string]
+  - `pot`: int
+- `legal_actions`: list[object]
+  - `action`: `"fold" | "check" | "call" | "bet" | "raise"`
+  - `min_amount`: int (optional for `fold`/`check`)
+  - `max_amount`: int (optional for `fold`/`check`)
+- `action_history`: list[object], full timeline within current hand
+  - `index`: int (0-based sequence number)
+  - `street`: `"preflop" | "flop" | "turn" | "river"`
+  - `player_id`: string
+  - `seat_id`: string
+  - `action`: `"blind" | "fold" | "check" | "call" | "bet" | "raise"`
+  - `amount`: int
+  - `pot_after`: int
+- `meta`: object
+  - `server_time`: RFC3339 timestamp
+  - `state_bytes`: int (serialized payload size in bytes)
+
+### Constraint Contract
+- Decision timeout: default `2.0s` per action call.
+- State payload limit: serialized payload must be `<= 65536` bytes (`64KiB`).
+- On timeout, oversized state, invalid response, or bot exception, engine applies safe fallback action and continues hand processing.
+
+### Field Semantics
+- All numeric chip values are integers in chip units (no floats).
+- `player_id` must be stable for a seated bot across hands; `seat_id` may change between tables/hands.
+- `action_history` is append-only, deterministic, and ordered by `index`.
+- `legal_actions` is authoritative; bots must not assume unavailable actions are legal.
+
 ## Security Requirements (Batch 2 Auth)
 - Passwords are never stored in plaintext; store salted adaptive hashes (`argon2id` preferred, `bcrypt` acceptable fallback).
 - Login endpoint applies brute-force protections (rate limit and temporary lockout/backoff).

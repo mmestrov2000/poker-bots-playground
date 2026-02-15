@@ -233,7 +233,7 @@ Goal: run bots in stronger isolation while providing complete table/player/actio
   - Document optional bot-local persistence expectations and limits. Done in template README with runtime constraints and helper methods.
   - Acceptance: Template lets developers build bots that can track all players and actions.
   - Test Strategy: Template smoke run with a sample hand context fixture (`backend/tests/test_bot_template_smoke.py` + `bot_template/fixtures/sample_v2_state.json`).
-- [ ] `M5-T5` Add dedicated isolation/protocol regression tests (owner: `test-agent`)
+- [x] `M5-T5` Add dedicated isolation/protocol regression tests (owner: `test-agent`)
   - Subtasks:
   - Add tests for protocol completeness and stable field semantics.
   - Add tests for isolation guarantees under bot failures.

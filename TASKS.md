@@ -226,13 +226,13 @@ Goal: run bots in stronger isolation while providing complete table/player/actio
   - Return normalized fallback action on runtime failure.
   - Acceptance: Bot crashes/timeouts are isolated and do not terminate API/match service.
   - Test Strategy: Integration tests with crashing, hanging, and malformed bots.
-- [ ] `M5-T4` Update `bot_template/` for protocol-v2 usage guidance (owner: `feature-agent`)
+- [x] `M5-T4` Update `bot_template/` for protocol-v2 usage guidance (owner: `feature-agent`)
   - Subtasks:
-  - Update template contract docs and sample bot parser for new context fields.
-  - Add examples for tracking opponent ids/actions from payload.
-  - Document optional bot-local persistence expectations and limits.
+  - Update template contract docs and sample bot parser for new context fields. Done in `bot_template/README.md` and `bot_template/bot.py`.
+  - Add examples for tracking opponent ids/actions from payload. Done in starter parser (`opponent_stats`) and fixture walkthrough.
+  - Document optional bot-local persistence expectations and limits. Done in template README with runtime constraints and helper methods.
   - Acceptance: Template lets developers build bots that can track all players and actions.
-  - Test Strategy: Template smoke run with a sample hand context fixture.
+  - Test Strategy: Template smoke run with a sample hand context fixture (`backend/tests/test_bot_template_smoke.py` + `bot_template/fixtures/sample_v2_state.json`).
 - [ ] `M5-T5` Add dedicated isolation/protocol regression tests (owner: `test-agent`)
   - Subtasks:
   - Add tests for protocol completeness and stable field semantics.

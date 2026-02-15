@@ -1,0 +1,132 @@
+{
+  "protocol_version": "2.0",
+  "decision_id": "table-77:hand-904:turn:2:6",
+  "table": {
+    "table_id": "table-77",
+    "hand_id": "hand-904",
+    "street": "turn",
+    "button_seat": "1",
+    "small_blind": 50,
+    "big_blind": 100
+  },
+  "hero": {
+    "player_id": "player-bb",
+    "seat_id": "2",
+    "name": "HeroBot",
+    "hole_cards": [
+      "Ah",
+      "Qs"
+    ],
+    "stack": 9600,
+    "bet": 300,
+    "to_call": 100,
+    "min_raise_to": 500,
+    "max_raise_to": 9600
+  },
+  "players": [
+    {
+      "player_id": "player-sb",
+      "seat_id": "1",
+      "name": "VillainBot",
+      "stack": 9400,
+      "bet": 400,
+      "folded": false,
+      "all_in": false,
+      "is_hero": false
+    },
+    {
+      "player_id": "player-bb",
+      "seat_id": "2",
+      "name": "HeroBot",
+      "stack": 9600,
+      "bet": 300,
+      "folded": false,
+      "all_in": false,
+      "is_hero": true
+    }
+  ],
+  "board": {
+    "cards": [
+      "Kd",
+      "7c",
+      "2h",
+      "Ts"
+    ],
+    "pot": 800
+  },
+  "legal_actions": [
+    {
+      "action": "fold"
+    },
+    {
+      "action": "call",
+      "min_amount": 100,
+      "max_amount": 100
+    },
+    {
+      "action": "raise",
+      "min_amount": 500,
+      "max_amount": 9600
+    }
+  ],
+  "action_history": [
+    {
+      "index": 0,
+      "street": "preflop",
+      "player_id": "player-sb",
+      "seat_id": "1",
+      "action": "blind",
+      "amount": 50,
+      "pot_after": 50
+    },
+    {
+      "index": 1,
+      "street": "preflop",
+      "player_id": "player-bb",
+      "seat_id": "2",
+      "action": "blind",
+      "amount": 100,
+      "pot_after": 150
+    },
+    {
+      "index": 2,
+      "street": "preflop",
+      "player_id": "player-sb",
+      "seat_id": "1",
+      "action": "raise",
+      "amount": 250,
+      "pot_after": 400
+    },
+    {
+      "index": 3,
+      "street": "preflop",
+      "player_id": "player-bb",
+      "seat_id": "2",
+      "action": "call",
+      "amount": 200,
+      "pot_after": 600
+    },
+    {
+      "index": 4,
+      "street": "flop",
+      "player_id": "player-sb",
+      "seat_id": "1",
+      "action": "bet",
+      "amount": 200,
+      "pot_after": 800
+    },
+    {
+      "index": 5,
+      "street": "flop",
+      "player_id": "player-bb",
+      "seat_id": "2",
+      "action": "call",
+      "amount": 200,
+      "pot_after": 1000
+    }
+  ],
+  "meta": {
+    "server_time": "2026-02-15T11:02:03+00:00",
+    "state_bytes": 1975
+  }
+}

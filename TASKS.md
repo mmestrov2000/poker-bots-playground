@@ -251,11 +251,11 @@ Goal: run bots in stronger isolation while providing complete table/player/actio
 ## Milestone 6: Lobby, Multi-Table UX, and Persistent Leaderboard
 Goal: replace single-table home with lobby + table pages and add persistent historical leaderboard.
 
-- [ ] `M6-T1` Introduce persistent storage models/migrations for lobby and leaderboard entities (owner: `feature-agent`)
+- [x] `M6-T1` Introduce persistent storage models/migrations for lobby and leaderboard entities (owner: `feature-agent`)
   - Subtasks:
-  - Add persistent models for users, bots, tables, and leaderboard aggregates.
-  - Add migration/bootstrap path for local/dev environments.
-  - Keep compatibility with existing runtime hand history files.
+  - Add persistent models for users, bots, tables, and leaderboard aggregates. Done: added `table_records` and `leaderboard_rows` persistence in shared auth SQLite store while preserving existing users/bots/session models.
+  - Add migration/bootstrap path for local/dev environments. Done: added deterministic versioned `schema_migrations` runner with legacy-schema backfill to preserve existing DB data and upgrade cleanly.
+  - Keep compatibility with existing runtime hand history files. Done: no changes to `HandStore` or hand-history `.txt` paths/format.
   - Acceptance: Data survives process restarts and schema is reproducible in clean setup.
   - Test Strategy: Persistence integration test across app restart.
 - [ ] `M6-T2` Implement lobby table list/create backend APIs (owner: `feature-agent`)

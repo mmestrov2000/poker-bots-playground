@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -18,6 +19,16 @@ class AuthStore:
         connection = sqlite3.connect(self._db_path, timeout=5.0)
         connection.row_factory = sqlite3.Row
         return connection
+
+    def _configure_connection(self, connection: sqlite3.Connection) -> None:
+        connection.executescript(
+            """
+            PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=FULL;
+            PRAGMA foreign_keys=ON;
+            PRAGMA secure_delete=ON;
+            """
+        )
 
     def _harden_permissions(self) -> None:
         """
@@ -39,12 +50,69 @@ class AuthStore:
 
     def _init_db(self) -> None:
         with self._connect() as connection:
-            connection.executescript(
+            self._configure_connection(connection)
+            existing_tables = self._list_tables(connection)
+            self._ensure_migrations_table(connection)
+            if self._is_legacy_schema(existing_tables):
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO schema_migrations (version, applied_at)
+                    VALUES (?, ?)
+                    """,
+                    (1, int(time.time())),
+                )
+
+            current_version = self._current_schema_version(connection)
+            for version, migration_sql in self._ordered_migrations():
+                if version <= current_version:
+                    continue
+                connection.executescript(migration_sql)
+                connection.execute(
+                    """
+                    INSERT INTO schema_migrations (version, applied_at)
+                    VALUES (?, ?)
+                    """,
+                    (version, int(time.time())),
+                )
+            connection.commit()
+
+    def _list_tables(self, connection: sqlite3.Connection) -> set[str]:
+        rows = connection.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table'
+            """
+        ).fetchall()
+        return {str(row["name"]) for row in rows}
+
+    def _ensure_migrations_table(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at INTEGER NOT NULL
+            )
+            """
+        )
+
+    def _is_legacy_schema(self, tables: set[str]) -> bool:
+        legacy_tables = {"users", "sessions", "login_attempts", "bot_records"}
+        return legacy_tables.issubset(tables) and "schema_migrations" not in tables
+
+    def _current_schema_version(self, connection: sqlite3.Connection) -> int:
+        row = connection.execute(
+            "SELECT MAX(version) AS version FROM schema_migrations"
+        ).fetchone()
+        if row is None or row["version"] is None:
+            return 0
+        return int(row["version"])
+
+    def _ordered_migrations(self) -> list[tuple[int, str]]:
+        return [
+            (
+                1,
                 """
-                PRAGMA journal_mode=WAL;
-                PRAGMA synchronous=FULL;
-                PRAGMA foreign_keys=ON;
-                PRAGMA secure_delete=ON;
                 CREATE TABLE IF NOT EXISTS users (
                     user_id TEXT PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
@@ -79,8 +147,34 @@ class AuthStore:
                 );
                 CREATE INDEX IF NOT EXISTS idx_bot_records_owner_user_id
                     ON bot_records(owner_user_id, created_at DESC);
+                """,
+            ),
+            (
+                2,
                 """
-            )
+                CREATE TABLE IF NOT EXISTS table_records (
+                    table_id TEXT PRIMARY KEY,
+                    created_by_user_id TEXT NOT NULL,
+                    small_blind REAL NOT NULL,
+                    big_blind REAL NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    FOREIGN KEY(created_by_user_id) REFERENCES users(user_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_table_records_created_at
+                    ON table_records(created_at DESC, table_id DESC);
+                CREATE TABLE IF NOT EXISTS leaderboard_rows (
+                    bot_id TEXT PRIMARY KEY,
+                    hands_played INTEGER NOT NULL,
+                    bb_won REAL NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    FOREIGN KEY(bot_id) REFERENCES bot_records(bot_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_leaderboard_rows_rank
+                    ON leaderboard_rows(hands_played DESC, bb_won DESC, bot_id DESC);
+                """,
+            ),
+        ]
 
     def create_user(self, username: str, password_hash: str, now_ts: int) -> dict:
         with self._lock, self._connect() as connection:
@@ -284,3 +378,116 @@ class AuthStore:
                 (bot_id,),
             ).fetchone()
             return dict(row) if row is not None else None
+
+    def create_table_record(
+        self,
+        *,
+        table_id: str,
+        created_by_user_id: str,
+        small_blind: float,
+        big_blind: float,
+        status: str,
+        now_ts: int,
+    ) -> dict:
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO table_records (
+                    table_id,
+                    created_by_user_id,
+                    small_blind,
+                    big_blind,
+                    status,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (table_id, created_by_user_id, small_blind, big_blind, status, now_ts),
+            )
+            connection.commit()
+        return {
+            "table_id": table_id,
+            "created_by_user_id": created_by_user_id,
+            "small_blind": small_blind,
+            "big_blind": big_blind,
+            "status": status,
+            "created_at": now_ts,
+        }
+
+    def list_table_records(self) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT table_id, created_by_user_id, small_blind, big_blind, status, created_at
+                FROM table_records
+                ORDER BY created_at DESC, table_id DESC
+                """
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def upsert_leaderboard_row(
+        self,
+        *,
+        bot_id: str,
+        hands_played: int,
+        bb_won: float,
+        updated_at: int,
+    ) -> dict:
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO leaderboard_rows (bot_id, hands_played, bb_won, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(bot_id) DO UPDATE SET
+                    hands_played = excluded.hands_played,
+                    bb_won = excluded.bb_won,
+                    updated_at = excluded.updated_at
+                """,
+                (bot_id, hands_played, bb_won, updated_at),
+            )
+            connection.commit()
+        return {
+            "bot_id": bot_id,
+            "hands_played": hands_played,
+            "bb_won": bb_won,
+            "updated_at": updated_at,
+        }
+
+    def get_leaderboard_row(self, bot_id: str) -> dict | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    bot_id,
+                    hands_played,
+                    bb_won,
+                    CASE
+                        WHEN hands_played > 0 THEN bb_won * 1.0 / hands_played
+                        ELSE 0.0
+                    END AS bb_per_hand,
+                    updated_at
+                FROM leaderboard_rows
+                WHERE bot_id = ?
+                """,
+                (bot_id,),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def list_leaderboard_rows(self) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    bot_id,
+                    hands_played,
+                    bb_won,
+                    CASE
+                        WHEN hands_played > 0 THEN bb_won * 1.0 / hands_played
+                        ELSE 0.0
+                    END AS bb_per_hand,
+                    updated_at
+                FROM leaderboard_rows
+                ORDER BY bb_per_hand DESC, hands_played DESC, updated_at DESC, bot_id DESC
+                """
+            ).fetchall()
+            return [dict(row) for row in rows]

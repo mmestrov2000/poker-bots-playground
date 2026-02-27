@@ -287,11 +287,11 @@ Goal: replace single-table home with lobby + table pages and add persistent hist
   - Ensure table route is keyed by `table_id`. Done: table-detail script parses route `table_id`, displays it in-page, and scopes seat assignment calls to `POST /tables/{table_id}/seats/{seat_id}/bot-select`.
   - Acceptance: Opening a table from lobby shows existing gameplay panels for that table.
   - Test Strategy: Manual table route validation and API-driven smoke checks. Done: extended frontend auth-shell smoke tests for table-detail template, script route-keying, and authenticated `/tables/{table_id}` page rendering.
-- [ ] `M6-T6` Add regression and edge-case tests for lobby/table/leaderboard flows (owner: `test-agent`)
+- [x] `M6-T6` Add regression and edge-case tests for lobby/table/leaderboard flows (owner: `test-agent`)
   - Subtasks:
-  - Add backend tests for multi-table lifecycle and scoreboard persistence.
-  - Add tests for leaderboard with zero-hand and high-volume edge cases.
-  - Add UI checks for table navigation and stale data handling.
+  - Add backend tests for multi-table lifecycle and scoreboard persistence. Done: API tests now cover concurrent multi-table listing lifecycle plus leaderboard persistence across `AuthService` restart.
+  - Add tests for leaderboard with zero-hand and high-volume edge cases. Done: API tests validate zero-hand `bb_per_hand=0.0`, high-volume precision, and deterministic sorting.
+  - Add UI checks for table navigation and stale data handling. Done: frontend smoke tests assert `/tables/{table_id}` authenticated shell rendering and `lobby.js` stale-payload fallback + refresh failure handling.
   - Acceptance: Multi-table and leaderboard regressions are detected automatically.
   - Test Strategy: Extended backend `pytest` + frontend smoke suite in CI.
 - [ ] `M6-T7` Review Milestone 6 for data consistency and UX regressions (owner: `review-agent`)

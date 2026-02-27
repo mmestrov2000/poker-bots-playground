@@ -1,4 +1,5 @@
 import io
+import math
 import stat
 import time
 import zipfile
@@ -471,6 +472,38 @@ def test_lobby_tables_create_rejects_invalid_blinds():
     assert bad_blinds.value.detail == "big_blind must be greater than small_blind"
 
 
+def test_lobby_tables_support_multi_table_lifecycle_listing():
+    alice = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    bob = routes.auth_service.ensure_user("bob", "correct-horse-battery-staple")
+
+    created_alpha = routes.create_lobby_table(
+        payload=routes.CreateLobbyTableRequest(small_blind=0.5, big_blind=1.0),
+        current_user=alice,
+    )["table"]
+    created_beta = routes.create_lobby_table(
+        payload=routes.CreateLobbyTableRequest(small_blind=1.0, big_blind=2.0),
+        current_user=bob,
+    )["table"]
+    created_gamma = routes.create_lobby_table(
+        payload=routes.CreateLobbyTableRequest(small_blind=2.0, big_blind=4.0),
+        current_user=alice,
+    )["table"]
+
+    listed = routes.list_lobby_tables(current_user=alice)["tables"]
+    listed_by_id = {table["table_id"]: table for table in listed}
+    created_ids = {
+        created_alpha["table_id"],
+        created_beta["table_id"],
+        created_gamma["table_id"],
+    }
+
+    assert set(listed_by_id) == created_ids
+    for table_id in created_ids:
+        assert listed_by_id[table_id]["status"] == "waiting"
+        assert listed_by_id[table_id]["seats_filled"] == 0
+        assert listed_by_id[table_id]["max_seats"] == 6
+
+
 @pytest.mark.anyio
 async def test_my_bots_ownership_isolated_between_users():
     alice = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
@@ -733,6 +766,103 @@ class PokerBot:
         beta["bot"]["bot_id"],
         gamma["bot"]["bot_id"],
     ]
+
+
+def test_lobby_leaderboard_handles_zero_hand_and_high_volume_rows():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    store = routes.auth_service.store
+
+    store.create_bot_record(
+        bot_id="bot-zero",
+        owner_user_id=current_user["user_id"],
+        name="Zero",
+        version="1.0.0",
+        artifact_path="/tmp/zero.zip",
+        now_ts=now_ts,
+    )
+    store.create_bot_record(
+        bot_id="bot-hi-pos",
+        owner_user_id=current_user["user_id"],
+        name="High Positive",
+        version="1.0.0",
+        artifact_path="/tmp/hi-pos.zip",
+        now_ts=now_ts + 1,
+    )
+    store.create_bot_record(
+        bot_id="bot-hi-neg",
+        owner_user_id=current_user["user_id"],
+        name="High Negative",
+        version="1.0.0",
+        artifact_path="/tmp/hi-neg.zip",
+        now_ts=now_ts + 2,
+    )
+
+    store.upsert_leaderboard_row(
+        bot_id="bot-zero",
+        hands_played=0,
+        bb_won=999999.0,
+        updated_at=now_ts + 3,
+    )
+    store.upsert_leaderboard_row(
+        bot_id="bot-hi-pos",
+        hands_played=1_000_000,
+        bb_won=25000.0,
+        updated_at=now_ts + 4,
+    )
+    store.upsert_leaderboard_row(
+        bot_id="bot-hi-neg",
+        hands_played=2_000_000,
+        bb_won=-10000.0,
+        updated_at=now_ts + 5,
+    )
+
+    leaderboard = routes.get_lobby_leaderboard(current_user=current_user)["leaderboard"]
+    rows = {entry["bot_id"]: entry for entry in leaderboard}
+
+    assert [entry["bot_id"] for entry in leaderboard] == ["bot-hi-pos", "bot-zero", "bot-hi-neg"]
+    assert rows["bot-zero"]["hands_played"] == 0
+    assert rows["bot-zero"]["bb_per_hand"] == 0.0
+    assert math.isfinite(rows["bot-hi-pos"]["bb_per_hand"])
+    assert rows["bot-hi-pos"]["bb_per_hand"] == pytest.approx(0.025)
+    assert rows["bot-hi-neg"]["bb_per_hand"] == pytest.approx(-0.005)
+
+
+def test_lobby_leaderboard_persists_across_auth_service_restart():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+
+    routes.auth_service.store.create_bot_record(
+        bot_id="persisted-bot",
+        owner_user_id=current_user["user_id"],
+        name="Persisted",
+        version="1.0.0",
+        artifact_path="/tmp/persisted.zip",
+        now_ts=now_ts,
+    )
+    routes.auth_service.store.upsert_leaderboard_row(
+        bot_id="persisted-bot",
+        hands_played=42,
+        bb_won=10.5,
+        updated_at=now_ts + 1,
+    )
+
+    original_auth_service = routes.auth_service
+    restarted_auth_service = AuthService(
+        store=AuthStore(routes.auth_settings.db_path),
+        settings=routes.auth_settings,
+    )
+    routes.auth_service = restarted_auth_service
+    try:
+        leaderboard = routes.get_lobby_leaderboard(current_user=current_user)["leaderboard"]
+    finally:
+        routes.auth_service = original_auth_service
+
+    persisted = next(entry for entry in leaderboard if entry["bot_id"] == "persisted-bot")
+    assert persisted["bot_name"] == "Persisted"
+    assert persisted["hands_played"] == 42
+    assert persisted["bb_won"] == pytest.approx(10.5)
+    assert persisted["bb_per_hand"] == pytest.approx(0.25)
 
 
 def test_auth_register_success_sets_session_and_me_returns_user():

@@ -11,7 +11,7 @@
       <header class="app-header">
         <div class="app-brand">
           <h1>Poker Bots Playground</h1>
-          <p>6-max No-Limit Texas Hold'em bot battle.</p>
+          <p>Browse active tables, create a new table, and track global bot performance.</p>
         </div>
         <nav class="app-nav" aria-label="Primary">
           <a id="nav-lobby" data-nav="lobby" href="/lobby">Lobby</a>
@@ -22,156 +22,56 @@
 
       <p id="auth-user" class="auth-user"></p>
 
-      <section class="arena">
-        <div class="arena-left">
-          <section class="table-area">
-            <div class="poker-table">
-              <div class="table-center">
-                <span>6-Max NLH Arena</span>
-              </div>
-
-              <article class="seat seat-1">
-                <h2>Seat 1</h2>
-                <p id="seat-1-name" class="seat-name">Open seat</p>
-                <button id="seat-1-take" class="seat-button">Take a seat</button>
-              </article>
-
-              <article class="seat seat-2">
-                <h2>Seat 2</h2>
-                <p id="seat-2-name" class="seat-name">Open seat</p>
-                <button id="seat-2-take" class="seat-button">Take a seat</button>
-              </article>
-
-              <article class="seat seat-3">
-                <h2>Seat 3</h2>
-                <p id="seat-3-name" class="seat-name">Open seat</p>
-                <button id="seat-3-take" class="seat-button">Take a seat</button>
-              </article>
-
-              <article class="seat seat-4">
-                <h2>Seat 4</h2>
-                <p id="seat-4-name" class="seat-name">Open seat</p>
-                <button id="seat-4-take" class="seat-button">Take a seat</button>
-              </article>
-
-              <article class="seat seat-5">
-                <h2>Seat 5</h2>
-                <p id="seat-5-name" class="seat-name">Open seat</p>
-                <button id="seat-5-take" class="seat-button">Take a seat</button>
-              </article>
-
-              <article class="seat seat-6">
-                <h2>Seat 6</h2>
-                <p id="seat-6-name" class="seat-name">Open seat</p>
-                <button id="seat-6-take" class="seat-button">Take a seat</button>
-              </article>
-            </div>
-          </section>
-
-          <section class="match-controls">
-            <div class="match-buttons">
-              <button id="start-match">Start</button>
-              <button id="pause-match" class="button-secondary">Pause</button>
-              <button id="resume-match" class="button-secondary">Resume</button>
-              <button id="end-match" class="button-danger">End</button>
-              <button id="reset-match" class="button-ghost">Reset</button>
-            </div>
-            <p id="match-status">Match: waiting</p>
-          </section>
-        </div>
-
-        <aside class="pnl-panel">
-          <div class="pnl-header">
-            <h2>Leaderboard</h2>
-            <p class="pnl-subtitle">BB/hand</p>
+      <section class="lobby-grid">
+        <section class="lobby-panel" aria-labelledby="create-table-title">
+          <div class="panel-header">
+            <h2 id="create-table-title">Create Table</h2>
           </div>
-          <ul id="leaderboard-list" class="leaderboard-list"></ul>
-          <div class="pnl-chart">
-            <svg id="pnl-chart" viewBox="0 0 640 280" preserveAspectRatio="none" aria-label="P&L graph">
-              <line id="pnl-zero-line" x1="0" y1="140" x2="640" y2="140" />
-              <path id="pnl-line-1" class="pnl-line pnl-line-1" />
-              <path id="pnl-line-2" class="pnl-line pnl-line-2" />
-              <path id="pnl-line-3" class="pnl-line pnl-line-3" />
-              <path id="pnl-line-4" class="pnl-line pnl-line-4" />
-              <path id="pnl-line-5" class="pnl-line pnl-line-5" />
-              <path id="pnl-line-6" class="pnl-line pnl-line-6" />
-            </svg>
-            <div id="pnl-empty" class="pnl-empty">No hands yet.</div>
+          <form id="create-table-form" class="create-table-form" novalidate>
+            <label class="field-label" for="create-small-blind">Small Blind</label>
+            <input id="create-small-blind" name="small_blind" type="number" min="0.01" step="0.01" value="0.5" required />
+
+            <label class="field-label" for="create-big-blind">Big Blind</label>
+            <input id="create-big-blind" name="big_blind" type="number" min="0.01" step="0.01" value="1" required />
+
+            <button id="create-table-submit" type="submit">Create Table</button>
+          </form>
+          <p id="create-table-feedback" class="lobby-feedback hidden" role="status"></p>
+        </section>
+
+        <section class="lobby-panel" aria-labelledby="lobby-leaderboard-title">
+          <div class="panel-header">
+            <h2 id="lobby-leaderboard-title">Global Leaderboard</h2>
+            <button id="refresh-leaderboard" type="button" class="button-secondary">Refresh</button>
           </div>
-        </aside>
+          <p id="lobby-leaderboard-state" class="lobby-state">Loading leaderboard...</p>
+          <ol id="lobby-leaderboard-list" class="lobby-leaderboard-list hidden"></ol>
+        </section>
       </section>
 
-      <section class="history-grid">
-        <section class="history-panel">
-          <div class="panel-header">
-            <h2>Hands Played</h2>
-            <button id="hand-history-button" type="button">Hand History</button>
-          </div>
-          <div id="hands-body" class="panel-body hands-body hidden">
-            <div id="hands-controls" class="hands-controls hidden">
-              <label class="hands-page-size">
-                Hands per page
-                <select id="hands-page-size">
-                  <option value="100" selected>100</option>
-                  <option value="250">250</option>
-                  <option value="1000">1000</option>
-                </select>
-              </label>
-              <div class="hands-pagination">
-                <button id="hands-prev" type="button" disabled>Prev</button>
-                <span id="hands-page-info">Page 1 of 1</span>
-                <button id="hands-next" type="button" disabled>Next</button>
-              </div>
-            </div>
-            <ul id="hands-list" class="hands-list hidden"></ul>
-          </div>
-        </section>
-
-        <section class="history-panel">
-          <div class="panel-header">
-            <h2>Hand Detail</h2>
-          </div>
-          <div class="panel-body detail-body">
-            <div class="detail-tabs">
-              <button id="hand-detail-logs" type="button" class="button-ghost detail-tab active">Logs</button>
-              <button id="hand-detail-replay" type="button" class="button-ghost detail-tab">Replay</button>
-            </div>
-            <pre id="hand-detail" class="hand-detail">Select a hand to view full history.</pre>
-          </div>
-        </section>
+      <section class="lobby-panel" aria-labelledby="lobby-tables-title">
+        <div class="panel-header">
+          <h2 id="lobby-tables-title">Tables</h2>
+          <button id="refresh-tables" type="button" class="button-secondary">Refresh</button>
+        </div>
+        <p id="lobby-tables-state" class="lobby-state">Loading tables...</p>
+        <div class="lobby-table-scroll">
+          <table id="lobby-tables-table" class="lobby-tables-table hidden">
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th>Blinds</th>
+                <th>Seats</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="lobby-tables-body"></tbody>
+          </table>
+        </div>
       </section>
     </main>
-
-    <div id="seat-assignment-panel" class="seat-assignment-modal hidden" aria-hidden="true">
-      <section class="seat-assignment" role="dialog" aria-modal="true" aria-labelledby="seat-assignment-title" aria-live="polite">
-        <div class="seat-assignment-header">
-          <h3 id="seat-assignment-title">Seat Assignment</h3>
-          <button id="seat-assignment-close" type="button" class="button-ghost">Close</button>
-        </div>
-
-        <div class="seat-assignment-grid">
-          <form id="seat-select-existing-form" class="seat-assignment-form">
-            <h4>Choose Existing Bot</h4>
-            <label class="field-label" for="seat-existing-bot-id">My Bots</label>
-            <select id="seat-existing-bot-id" name="bot_id"></select>
-            <button id="seat-select-existing-submit" type="submit">Seat Selected Bot</button>
-          </form>
-
-          <form id="seat-create-new-form" class="seat-assignment-form">
-            <h4>Create New Bot</h4>
-            <label class="field-label" for="seat-new-name">Bot Name</label>
-            <input id="seat-new-name" name="name" type="text" maxlength="120" required />
-            <label class="field-label" for="seat-new-version">Version</label>
-            <input id="seat-new-version" name="version" type="text" maxlength="64" required />
-            <label class="field-label" for="seat-new-file">Bot Package (.zip)</label>
-            <input id="seat-new-file" name="bot_file" type="file" accept=".zip" required />
-            <button id="seat-create-new-submit" type="submit">Create and Seat</button>
-          </form>
-        </div>
-
-        <p id="seat-assignment-feedback" class="seat-assignment-feedback hidden"></p>
-      </section>
-    </div>
 
     <script src="/static/app-shell.js?v=__ASSET_VERSION__" defer></script>
     <script src="/static/lobby.js?v=__ASSET_VERSION__" defer></script>

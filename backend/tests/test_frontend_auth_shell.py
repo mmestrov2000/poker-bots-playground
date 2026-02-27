@@ -127,15 +127,15 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'href="/my-bots"' in lobby_html
     assert "/static/lobby.js" in lobby_html
 
-    # Existing table UX controls remain available on the Lobby page.
-    assert 'id="seat-1-take"' in lobby_html
-    assert 'id="seat-6-take"' in lobby_html
-    assert 'id="start-match"' in lobby_html
-    assert 'id="seat-assignment-panel"' in lobby_html
-    assert 'id="seat-existing-bot-id"' in lobby_html
-    assert 'id="seat-select-existing-form"' in lobby_html
-    assert 'id="seat-create-new-form"' in lobby_html
-    assert 'id="seat-assignment-feedback"' in lobby_html
+    # Lobby page renders list/create controls and leaderboard panel.
+    assert 'id="create-table-form"' in lobby_html
+    assert 'id="create-small-blind"' in lobby_html
+    assert 'id="create-big-blind"' in lobby_html
+    assert 'id="create-table-feedback"' in lobby_html
+    assert 'id="lobby-tables-state"' in lobby_html
+    assert 'id="lobby-tables-body"' in lobby_html
+    assert 'id="lobby-leaderboard-state"' in lobby_html
+    assert 'id="lobby-leaderboard-list"' in lobby_html
 
     assert 'id="my-bots-list"' in my_bots_html
     assert 'id="my-bots-upload-form"' in my_bots_html
@@ -228,15 +228,17 @@ def test_frontend_lobby_script_smoke_for_seat_select_and_inline_create():
     frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
     lobby_js = (frontend_dir / "lobby.js").read_text(encoding="utf-8")
 
-    assert 'window.AppShell.request("/my/bots")' in lobby_js
-    assert 'window.AppShell.request(`/tables/default/seats/${activeSeatId}/bot-select`' in lobby_js
-    assert 'window.AppShell.request("/my/bots", {' in lobby_js
-    assert "New bot created and seated successfully." in lobby_js
+    assert 'window.AppShell.request("/lobby/tables")' in lobby_js
+    assert 'window.AppShell.request("/lobby/tables", {' in lobby_js
+    assert 'window.AppShell.request("/lobby/leaderboard")' in lobby_js
+    assert "window.location.assign(`/tables/${encodeURIComponent(tableId)}`)" in lobby_js
+    assert "Table created successfully." in lobby_js
 
 
 def test_frontend_login_redirect_for_protected_pages():
     lobby_endpoint = get_page_endpoint("/lobby")
     my_bots_endpoint = get_page_endpoint("/my-bots")
+    table_endpoint = get_page_endpoint("/tables/{table_id}")
 
     lobby = lobby_endpoint(build_page_request(path="/lobby"))
     assert lobby.status_code == 302
@@ -245,6 +247,10 @@ def test_frontend_login_redirect_for_protected_pages():
     my_bots = my_bots_endpoint(build_page_request(path="/my-bots"))
     assert my_bots.status_code == 302
     assert my_bots.headers["location"] == "/login"
+
+    table_detail = table_endpoint(build_page_request(path="/tables/table-123"), table_id="table-123")
+    assert table_detail.status_code == 302
+    assert table_detail.headers["location"] == "/login"
 
 
 def test_frontend_my_bots_page_loads_for_authenticated_user():

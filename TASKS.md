@@ -272,11 +272,11 @@ Goal: replace single-table home with lobby + table pages and add persistent hist
   - Add `GET /api/v1/lobby/leaderboard` sorted by `bb/hand`.
   - Acceptance: Leaderboard includes all historical participants with stable metrics.
   - Test Strategy: Integration tests for aggregate updates and ordering.
-- [ ] `M6-T4` Build Lobby frontend page with table list/create and leaderboard (owner: `feature-agent`)
+- [x] `M6-T4` Build Lobby frontend page with table list/create and leaderboard (owner: `feature-agent`)
   - Subtasks:
-  - Replace current main page with lobby list and create-table controls.
-  - Add leaderboard panel with persistent bot rankings.
-  - Add navigation from lobby rows to table detail page.
+  - Replace current main page with lobby list and create-table controls. Done: rewired `frontend/lobby.html` + `frontend/lobby.js` to render authenticated table list and create flow against `/api/v1/lobby/tables`.
+  - Add leaderboard panel with persistent bot rankings. Done: lobby now renders a dedicated global leaderboard section fed by `/api/v1/lobby/leaderboard`.
+  - Add navigation from lobby rows to table detail page. Done: table rows navigate to `/tables/{table_id}` and backend now serves this protected route.
   - Acceptance: Lobby is default authenticated landing page with functional list/create/leaderboard.
   - Test Strategy: Frontend smoke test for list/create/navigation flows.
 - [ ] `M6-T5` Implement table detail routing with existing live table experience (owner: `feature-agent`)

@@ -14,7 +14,7 @@ from app.bots.loader import BotLoadError, save_upload
 from app.bots.security import MAX_UPLOAD_BYTES
 from app.bots.validator import validate_bot_archive
 from app.engine.game import SEAT_ORDER
-from app.services.match_service import MatchService
+from app.services.match_service import HandRecord, MatchService
 from app.storage.hand_store import HandStore
 
 
@@ -25,7 +25,31 @@ uploads_dir.mkdir(parents=True, exist_ok=True)
 
 auth_settings = AuthSettings.from_env(repo_root=repo_root)
 auth_service = AuthService(store=AuthStore(auth_settings.db_path), settings=auth_settings)
-match_service = MatchService(hand_store=HandStore())
+
+
+def _update_persistent_leaderboard(hand: HandRecord, seat_bot_ids: dict[str, str]) -> None:
+    big_blind = match_service.engine.big_blind_cents / 100
+    if big_blind <= 0:
+        return
+
+    updated_at = int(hand.completed_at.timestamp())
+    for seat_id in hand.active_seats:
+        bot_id = seat_bot_ids.get(seat_id)
+        if bot_id is None:
+            continue
+        delta_bb = hand.deltas.get(seat_id, 0.0) / big_blind
+        existing = auth_service.store.get_leaderboard_row(bot_id)
+        hands_played = (existing["hands_played"] if existing else 0) + 1
+        bb_won = (existing["bb_won"] if existing else 0.0) + delta_bb
+        auth_service.store.upsert_leaderboard_row(
+            bot_id=bot_id,
+            hands_played=hands_played,
+            bb_won=bb_won,
+            updated_at=updated_at,
+        )
+
+
+match_service = MatchService(hand_store=HandStore(), on_hand_completed=_update_persistent_leaderboard)
 
 
 class LoginRequest(BaseModel):
@@ -95,6 +119,23 @@ def _format_table_for_response(record: dict) -> dict:
         "seats_filled": 0,
         "max_seats": len(SEAT_ORDER),
         "created_at": created_at,
+    }
+
+
+def _format_leaderboard_row(row: dict) -> dict:
+    bot = auth_service.store.get_bot_record(row["bot_id"])
+    owner = auth_service.store.get_user_by_id(bot["owner_user_id"]) if bot is not None else None
+    updated_at_iso = datetime.fromtimestamp(row["updated_at"], tz=timezone.utc).isoformat()
+    return {
+        "bot_id": row["bot_id"],
+        "bot_name": bot["name"] if bot is not None else None,
+        "bot_version": bot["version"] if bot is not None else None,
+        "owner_user_id": bot["owner_user_id"] if bot is not None else None,
+        "owner_username": owner["username"] if owner is not None else None,
+        "hands_played": row["hands_played"],
+        "bb_won": row["bb_won"],
+        "bb_per_hand": row["bb_per_hand"],
+        "updated_at": updated_at_iso,
     }
 
 
@@ -261,7 +302,9 @@ def create_lobby_table(
 
 @router.get("/lobby/leaderboard")
 def get_lobby_leaderboard(current_user: dict = Depends(require_authenticated_user)) -> dict:
-    return {"leaderboard": [], "user": current_user}
+    rows = auth_service.store.list_leaderboard_rows()
+    leaderboard = [_format_leaderboard_row(row) for row in rows]
+    return {"leaderboard": leaderboard, "user": current_user}
 
 
 @router.post("/tables/{table_id}/seats/{seat_id}/bot-select")
@@ -287,6 +330,7 @@ def select_bot_for_seat(
             normalized_seat,
             bot["name"],
             bot_path=artifact_path,
+            bot_id=bot["bot_id"],
         )
     except BotLoadError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

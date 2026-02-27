@@ -265,7 +265,8 @@ Goal: replace single-table home with lobby + table pages and add persistent hist
   - Enforce auth and input validation for creation flow. Done: endpoints require authenticated user dependency and reject invalid blind structure (`big_blind <= small_blind`).
   - Acceptance: Users can create tables and retrieve consistent lobby listings.
   - Test Strategy: API integration tests for create/list success and validation failures. Done: added route tests covering create/list success and blind validation errors.
-- [ ] `M6-T3` Implement leaderboard aggregation and read API (owner: `feature-agent`)
+  - Test Strategy: API integration tests for create/list success and validation failures. Done: added route tests covering create/list success and blind validation errors.
+- [x] `M6-T3` Implement leaderboard aggregation and read API (owner: `feature-agent`)
   - Subtasks:
   - Compute and persist `bb_won`, `hands_played`, and `bb/hand` per bot.
   - Update aggregates after each completed hand.

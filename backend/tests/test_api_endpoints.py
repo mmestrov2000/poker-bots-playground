@@ -64,6 +64,7 @@ def isolate_route_state(tmp_path, monkeypatch):
     monkeypatch.setattr(routes, "match_service", service)
     monkeypatch.setattr(routes, "auth_settings", settings)
     monkeypatch.setattr(routes, "auth_service", auth_service)
+    service._on_hand_completed = routes._update_persistent_leaderboard
     yield
     service.reset_match()
 
@@ -623,6 +624,115 @@ class PokerBot:
         )
     assert forbidden.value.status_code == 403
     assert forbidden.value.detail == "Forbidden"
+
+
+@pytest.mark.anyio
+async def test_lobby_leaderboard_updates_after_completed_hand():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+"""
+        }
+    )
+    alpha = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("alpha.zip", payload),
+        name="Alpha",
+        version="1.0.0",
+    )
+    beta = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("beta.zip", payload),
+        name="Beta",
+        version="1.0.0",
+    )
+    routes.select_bot_for_seat(
+        table_id="default",
+        seat_id="1",
+        payload=routes.SelectBotRequest(bot_id=alpha["bot"]["bot_id"]),
+        current_user=current_user,
+    )
+    routes.select_bot_for_seat(
+        table_id="default",
+        seat_id="2",
+        payload=routes.SelectBotRequest(bot_id=beta["bot"]["bot_id"]),
+        current_user=current_user,
+    )
+
+    with routes.match_service._lock:
+        routes.match_service._simulate_hand_locked()
+
+    leaderboard = routes.get_lobby_leaderboard(current_user=current_user)["leaderboard"]
+    by_bot = {entry["bot_id"]: entry for entry in leaderboard}
+    assert set(by_bot) == {alpha["bot"]["bot_id"], beta["bot"]["bot_id"]}
+    assert by_bot[alpha["bot"]["bot_id"]]["hands_played"] == 1
+    assert by_bot[beta["bot"]["bot_id"]]["hands_played"] == 1
+    assert (
+        by_bot[alpha["bot"]["bot_id"]]["bb_won"]
+        + by_bot[beta["bot"]["bot_id"]]["bb_won"]
+        == pytest.approx(0.0, abs=1e-9)
+    )
+
+
+@pytest.mark.anyio
+async def test_lobby_leaderboard_is_sorted_by_bb_per_hand():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+"""
+        }
+    )
+    alpha = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("alpha.zip", payload),
+        name="Alpha",
+        version="1.0.0",
+    )
+    beta = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("beta.zip", payload),
+        name="Beta",
+        version="1.0.0",
+    )
+    gamma = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("gamma.zip", payload),
+        name="Gamma",
+        version="1.0.0",
+    )
+    routes.auth_service.store.upsert_leaderboard_row(
+        bot_id=alpha["bot"]["bot_id"],
+        hands_played=10,
+        bb_won=25.0,
+        updated_at=1700000010,
+    )
+    routes.auth_service.store.upsert_leaderboard_row(
+        bot_id=beta["bot"]["bot_id"],
+        hands_played=10,
+        bb_won=5.0,
+        updated_at=1700000011,
+    )
+    routes.auth_service.store.upsert_leaderboard_row(
+        bot_id=gamma["bot"]["bot_id"],
+        hands_played=20,
+        bb_won=5.0,
+        updated_at=1700000012,
+    )
+
+    leaderboard = routes.get_lobby_leaderboard(current_user=current_user)["leaderboard"]
+    assert [entry["bot_id"] for entry in leaderboard] == [
+        alpha["bot"]["bot_id"],
+        beta["bot"]["bot_id"],
+        gamma["bot"]["bot_id"],
+    ]
 
 
 def test_auth_register_success_sets_session_and_me_returns_user():

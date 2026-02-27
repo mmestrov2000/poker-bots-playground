@@ -66,6 +66,12 @@ def create_app() -> FastAPI:
                 return RedirectResponse(url="/login", status_code=302)
             return render_template("lobby")
 
+        @app.get("/tables/{table_id}", include_in_schema=False)
+        def serve_table_detail(request: Request, table_id: str) -> Response:
+            if not is_authenticated(request):
+                return RedirectResponse(url="/login", status_code=302)
+            return render_template("lobby")
+
         @app.get("/my-bots", include_in_schema=False)
         def serve_my_bots(request: Request) -> Response:
             if not is_authenticated(request):

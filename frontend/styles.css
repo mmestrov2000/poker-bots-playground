@@ -785,3 +785,126 @@ button:disabled {
     padding: 1rem;
   }
 }
+
+.lobby-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.lobby-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.create-table-form {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.create-table-form input,
+.create-table-form select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  background: #fff;
+}
+
+#create-table-submit {
+  grid-column: 1 / -1;
+  width: fit-content;
+}
+
+.lobby-feedback,
+.lobby-state {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.lobby-feedback.is-success {
+  color: var(--accent);
+}
+
+.lobby-feedback.is-error {
+  color: var(--danger);
+}
+
+.lobby-table-scroll {
+  overflow-x: auto;
+}
+
+.lobby-tables-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.lobby-tables-table th,
+.lobby-tables-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.6rem 0.5rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.lobby-tables-table th {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.lobby-tables-table td {
+  font-size: 0.92rem;
+}
+
+.table-id {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.82rem;
+}
+
+.lobby-leaderboard-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.lobby-leaderboard-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: #fbfbf8;
+}
+
+.lobby-leaderboard-rank {
+  font-weight: 700;
+}
+
+.lobby-leaderboard-meta {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.lobby-leaderboard-stat {
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .lobby-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .create-table-form {
+    grid-template-columns: 1fr;
+  }
+}

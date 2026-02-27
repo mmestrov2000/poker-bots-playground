@@ -434,6 +434,42 @@ def test_my_bots_endpoints_reject_unauthenticated_access():
     assert exc_info.value.detail == "Authentication required"
 
 
+def test_lobby_tables_list_and_create_success():
+    alice = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    bob = routes.auth_service.ensure_user("bob", "correct-horse-battery-staple")
+
+    created = routes.create_lobby_table(
+        payload=routes.CreateLobbyTableRequest(small_blind=0.5, big_blind=1.0),
+        current_user=alice,
+    )
+    table = created["table"]
+    assert table["table_id"]
+    assert table["small_blind"] == 0.5
+    assert table["big_blind"] == 1.0
+    assert table["status"] == "waiting"
+    assert table["seats_filled"] == 0
+    assert table["max_seats"] == 6
+    assert "created_by_user_id" not in table
+
+    listed = routes.list_lobby_tables(current_user=bob)
+    assert len(listed["tables"]) == 1
+    assert listed["tables"][0]["table_id"] == table["table_id"]
+    assert listed["tables"][0]["small_blind"] == 0.5
+    assert listed["tables"][0]["big_blind"] == 1.0
+
+
+def test_lobby_tables_create_rejects_invalid_blinds():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+
+    with pytest.raises(HTTPException) as bad_blinds:
+        routes.create_lobby_table(
+            payload=routes.CreateLobbyTableRequest(small_blind=1.0, big_blind=1.0),
+            current_user=current_user,
+        )
+    assert bad_blinds.value.status_code == 400
+    assert bad_blinds.value.detail == "big_blind must be greater than small_blind"
+
+
 @pytest.mark.anyio
 async def test_my_bots_ownership_isolated_between_users():
     alice = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")

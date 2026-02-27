@@ -42,6 +42,11 @@ class SelectBotRequest(BaseModel):
     bot_id: str = Field(min_length=1, max_length=128)
 
 
+class CreateLobbyTableRequest(BaseModel):
+    small_blind: float = Field(gt=0)
+    big_blind: float = Field(gt=0)
+
+
 def _should_set_secure_cookie(request: Request) -> bool:
     if auth_settings.session_cookie_secure is not None:
         return auth_settings.session_cookie_secure
@@ -76,6 +81,19 @@ def _format_bot_for_response(bot: dict) -> dict:
         "name": bot["name"],
         "version": bot["version"],
         "status": "ready",
+        "created_at": created_at,
+    }
+
+
+def _format_table_for_response(record: dict) -> dict:
+    created_at = datetime.fromtimestamp(record["created_at"], tz=timezone.utc).isoformat()
+    return {
+        "table_id": record["table_id"],
+        "small_blind": float(record["small_blind"]),
+        "big_blind": float(record["big_blind"]),
+        "status": record["status"],
+        "seats_filled": 0,
+        "max_seats": len(SEAT_ORDER),
         "created_at": created_at,
     }
 
@@ -214,12 +232,31 @@ async def upload_my_bot(
 
 @router.get("/lobby/tables")
 def list_lobby_tables(current_user: dict = Depends(require_authenticated_user)) -> dict:
-    return {"tables": [], "user": current_user}
+    records = auth_service.store.list_table_records()
+    tables = [_format_table_for_response(record) for record in records]
+    return {"tables": tables, "user": current_user}
 
 
 @router.post("/lobby/tables")
-def create_lobby_table(current_user: dict = Depends(require_authenticated_user)) -> dict:
-    raise HTTPException(status_code=501, detail="Lobby table creation is not implemented yet")
+def create_lobby_table(
+    payload: CreateLobbyTableRequest,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    small_blind = float(payload.small_blind)
+    big_blind = float(payload.big_blind)
+    if big_blind <= small_blind:
+        raise HTTPException(status_code=400, detail="big_blind must be greater than small_blind")
+
+    now_ts = int(datetime.now(tz=timezone.utc).timestamp())
+    record = auth_service.store.create_table_record(
+        table_id=uuid4().hex,
+        created_by_user_id=current_user["user_id"],
+        small_blind=small_blind,
+        big_blind=big_blind,
+        status="waiting",
+        now_ts=now_ts,
+    )
+    return {"table": _format_table_for_response(record), "user": current_user}
 
 
 @router.get("/lobby/leaderboard")

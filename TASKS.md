@@ -251,20 +251,20 @@ Goal: run bots in stronger isolation while providing complete table/player/actio
 ## Milestone 6: Lobby, Multi-Table UX, and Persistent Leaderboard
 Goal: replace single-table home with lobby + table pages and add persistent historical leaderboard.
 
-- [ ] `M6-T1` Introduce persistent storage models/migrations for lobby and leaderboard entities (owner: `feature-agent`)
+- [x] `M6-T1` Introduce persistent storage models/migrations for lobby and leaderboard entities (owner: `feature-agent`)
   - Subtasks:
-  - Add persistent models for users, bots, tables, and leaderboard aggregates.
-  - Add migration/bootstrap path for local/dev environments.
-  - Keep compatibility with existing runtime hand history files.
+  - Add persistent models for users, bots, tables, and leaderboard aggregates. Done: added `table_records` and `leaderboard_rows` persistence in shared auth SQLite store while preserving existing users/bots/session models.
+  - Add migration/bootstrap path for local/dev environments. Done: added deterministic versioned `schema_migrations` runner with legacy-schema backfill to preserve existing DB data and upgrade cleanly.
+  - Keep compatibility with existing runtime hand history files. Done: no changes to `HandStore` or hand-history `.txt` paths/format.
   - Acceptance: Data survives process restarts and schema is reproducible in clean setup.
   - Test Strategy: Persistence integration test across app restart.
-- [ ] `M6-T2` Implement lobby table list/create backend APIs (owner: `feature-agent`)
+- [x] `M6-T2` Implement lobby table list/create backend APIs (owner: `feature-agent`)
   - Subtasks:
-  - Add `GET /api/v1/lobby/tables` and `POST /api/v1/lobby/tables`.
-  - Return required table metadata for list rendering.
-  - Enforce auth and input validation for creation flow.
+  - Add `GET /api/v1/lobby/tables` and `POST /api/v1/lobby/tables`. Done: implemented authenticated lobby endpoints backed by persisted `table_records`.
+  - Return required table metadata for list rendering. Done: list/create responses include `table_id`, blinds, `status`, `seats_filled`, `max_seats`, and `created_at`.
+  - Enforce auth and input validation for creation flow. Done: endpoints require authenticated user dependency and reject invalid blind structure (`big_blind <= small_blind`).
   - Acceptance: Users can create tables and retrieve consistent lobby listings.
-  - Test Strategy: API integration tests for create/list success and validation failures.
+  - Test Strategy: API integration tests for create/list success and validation failures. Done: added route tests covering create/list success and blind validation errors.
 - [ ] `M6-T3` Implement leaderboard aggregation and read API (owner: `feature-agent`)
   - Subtasks:
   - Compute and persist `bb_won`, `hands_played`, and `bb/hand` per bot.

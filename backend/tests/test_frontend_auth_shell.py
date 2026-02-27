@@ -113,6 +113,7 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
     login_html = (frontend_dir / "login.html").read_text(encoding="utf-8")
     lobby_html = (frontend_dir / "lobby.html").read_text(encoding="utf-8")
+    table_detail_html = (frontend_dir / "table-detail.html").read_text(encoding="utf-8")
     my_bots_html = (frontend_dir / "my-bots.html").read_text(encoding="utf-8")
 
     assert 'id="auth-form"' in login_html
@@ -136,6 +137,17 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'id="lobby-tables-body"' in lobby_html
     assert 'id="lobby-leaderboard-state"' in lobby_html
     assert 'id="lobby-leaderboard-list"' in lobby_html
+
+    # Table detail page renders the live gameplay experience.
+    assert 'id="table-id-label"' in table_detail_html
+    assert 'id="seat-1-name"' in table_detail_html
+    assert 'id="seat-6-name"' in table_detail_html
+    assert 'id="start-match"' in table_detail_html
+    assert 'id="hands-list"' in table_detail_html
+    assert 'id="hand-detail"' in table_detail_html
+    assert 'id="pnl-chart"' in table_detail_html
+    assert 'id="leaderboard-list"' in table_detail_html
+    assert "/static/table-detail.js" in table_detail_html
 
     assert 'id="my-bots-list"' in my_bots_html
     assert 'id="my-bots-upload-form"' in my_bots_html
@@ -235,6 +247,18 @@ def test_frontend_lobby_script_smoke_for_seat_select_and_inline_create():
     assert "Table created successfully." in lobby_js
 
 
+def test_frontend_table_detail_script_smoke_for_table_route_and_live_interactions():
+    frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+    table_detail_js = (frontend_dir / "table-detail.js").read_text(encoding="utf-8")
+
+    assert "window.location.pathname.match(/^\\/tables\\/([^/]+)$/)" in table_detail_js
+    assert "window.AppShell.request(`/tables/${encodeURIComponent(tableId)}/seats/${activeSeatId}/bot-select`" in table_detail_js
+    assert "`/hands?${params.toString()}`" in table_detail_js
+    assert "`/hands/${handId}`" in table_detail_js
+    assert 'window.AppShell.request(`/pnl${query ? `?${query}` : ""}`)' in table_detail_js
+    assert 'window.AppShell.request("/leaderboard")' in table_detail_js
+
+
 def test_frontend_login_redirect_for_protected_pages():
     lobby_endpoint = get_page_endpoint("/lobby")
     my_bots_endpoint = get_page_endpoint("/my-bots")
@@ -270,6 +294,26 @@ def test_frontend_my_bots_page_loads_for_authenticated_user():
     body = page.body.decode("utf-8")
     assert 'id="my-bots-list"' in body
     assert 'id="my-bots-upload-form"' in body
+
+
+def test_frontend_table_detail_page_loads_for_authenticated_user():
+    login_response = Response()
+    routes.login(
+        routes.LoginRequest(username="alice", password="correct-horse-battery-staple"),
+        login_response,
+        build_request_with_cookies(),
+    )
+    session_id = extract_session_cookie(login_response)
+    page_request = build_page_request(
+        path="/tables/table-123",
+        cookies={routes.auth_settings.session_cookie_name: session_id},
+    )
+    page = get_page_endpoint("/tables/{table_id}")(page_request, table_id="table-123")
+    assert page.status_code == 200
+    body = page.body.decode("utf-8")
+    assert 'id="table-id-label"' in body
+    assert 'id="seat-1-name"' in body
+    assert 'id="hands-list"' in body
 
 
 @pytest.mark.anyio

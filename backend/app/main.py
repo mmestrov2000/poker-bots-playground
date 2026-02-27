@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
         template_files = {
             "login": frontend_dir / "login.html",
             "lobby": frontend_dir / "lobby.html",
+            "table-detail": frontend_dir / "table-detail.html",
             "my-bots": frontend_dir / "my-bots.html",
         }
         template_cache = {
@@ -70,7 +71,7 @@ def create_app() -> FastAPI:
         def serve_table_detail(request: Request, table_id: str) -> Response:
             if not is_authenticated(request):
                 return RedirectResponse(url="/login", status_code=302)
-            return render_template("lobby")
+            return render_template("table-detail")
 
         @app.get("/my-bots", include_in_schema=False)
         def serve_my_bots(request: Request) -> Response:

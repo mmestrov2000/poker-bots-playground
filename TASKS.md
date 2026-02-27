@@ -280,13 +280,13 @@ Goal: replace single-table home with lobby + table pages and add persistent hist
   - Add navigation from lobby rows to table detail page. Done: table rows navigate to `/tables/{table_id}` and backend now serves this protected route.
   - Acceptance: Lobby is default authenticated landing page with functional list/create/leaderboard.
   - Test Strategy: Frontend smoke test for list/create/navigation flows.
-- [ ] `M6-T5` Implement table detail routing with existing live table experience (owner: `feature-agent`)
+- [x] `M6-T5` Implement table detail routing with existing live table experience (owner: `feature-agent`)
   - Subtasks:
-  - Move current table UI into table-detail route/page.
-  - Keep live hand summary, chart, and history interactions.
-  - Ensure table route is keyed by `table_id`.
+  - Move current table UI into table-detail route/page. Done: added dedicated `frontend/table-detail.html` and `frontend/table-detail.js`, and updated backend page routing to render this template at `/tables/{table_id}`.
+  - Keep live hand summary, chart, and history interactions. Done: restored match controls, leaderboard/P&L chart, hand list/history/detail panels, and seat assignment modal interactions in table-detail script.
+  - Ensure table route is keyed by `table_id`. Done: table-detail script parses route `table_id`, displays it in-page, and scopes seat assignment calls to `POST /tables/{table_id}/seats/{seat_id}/bot-select`.
   - Acceptance: Opening a table from lobby shows existing gameplay panels for that table.
-  - Test Strategy: Manual table route validation and API-driven smoke checks.
+  - Test Strategy: Manual table route validation and API-driven smoke checks. Done: extended frontend auth-shell smoke tests for table-detail template, script route-keying, and authenticated `/tables/{table_id}` page rendering.
 - [ ] `M6-T6` Add regression and edge-case tests for lobby/table/leaderboard flows (owner: `test-agent`)
   - Subtasks:
   - Add backend tests for multi-table lifecycle and scoreboard persistence.

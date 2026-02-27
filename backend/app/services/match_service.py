@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import Event, Lock, Thread, current_thread
 from typing import Literal
+from collections.abc import Callable
 
 from app.bots.loader import resolve_bot_protocol_from_zip
 from app.bots.runtime import BotRunner
@@ -19,6 +20,7 @@ class SeatState:
     seat_id: SeatId
     ready: bool = False
     bot_name: str | None = None
+    bot_id: str | None = None
     uploaded_at: datetime | None = None
 
     def to_dict(self) -> dict:
@@ -26,6 +28,7 @@ class SeatState:
             "seat_id": self.seat_id,
             "ready": self.ready,
             "bot_name": self.bot_name,
+            "bot_id": self.bot_id,
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
         }
 
@@ -54,9 +57,15 @@ class HandRecord:
 class MatchService:
     HAND_INTERVAL_SECONDS = 1.0
 
-    def __init__(self, hand_store: HandStore, engine: PokerEngine | None = None) -> None:
+    def __init__(
+        self,
+        hand_store: HandStore,
+        engine: PokerEngine | None = None,
+        on_hand_completed: Callable[[HandRecord, dict[SeatId, str]], None] | None = None,
+    ) -> None:
         self.hand_store = hand_store
         self.engine = engine or PokerEngine()
+        self._on_hand_completed = on_hand_completed
         self._lock = Lock()
         self._stop_event = Event()
         self._loop_thread: Thread | None = None
@@ -137,7 +146,13 @@ class MatchService:
             "history": history_text,
         }
 
-    def register_bot(self, seat_id: SeatId, bot_name: str, bot_path: Path | None = None) -> dict:
+    def register_bot(
+        self,
+        seat_id: SeatId,
+        bot_name: str,
+        bot_path: Path | None = None,
+        bot_id: str | None = None,
+    ) -> dict:
         if seat_id not in self._seats:
             raise ValueError(f"Invalid seat id: {seat_id}")
 
@@ -153,6 +168,7 @@ class MatchService:
             seat = self._seats[seat_id]
             seat.ready = True
             seat.bot_name = bot_name
+            seat.bot_id = bot_id
             seat.uploaded_at = now
 
             return seat.to_dict()
@@ -301,18 +317,28 @@ class MatchService:
         deltas = {seat_id: 0.0 for seat_id in SEAT_ORDER}
         for seat_id, delta_cents in result.deltas.items():
             deltas[seat_id] = delta_cents / 100
-        self._hands.append(
-            HandRecord(
-                hand_id=hand_id,
-                completed_at=datetime.now(timezone.utc),
-                summary=summary,
-                winners=result.winners,
-                pot=pot_size,
-                history_path=str(history_path),
-                deltas=deltas,
-                active_seats=active_seats,
-            )
+        hand_record = HandRecord(
+            hand_id=hand_id,
+            completed_at=datetime.now(timezone.utc),
+            summary=summary,
+            winners=result.winners,
+            pot=pot_size,
+            history_path=str(history_path),
+            deltas=deltas,
+            active_seats=active_seats,
         )
+        self._hands.append(hand_record)
+        if self._on_hand_completed is not None:
+            seat_bot_ids = {
+                seat_id: self._seats[seat_id].bot_id
+                for seat_id in active_seats
+                if self._seats[seat_id].bot_id is not None
+            }
+            try:
+                self._on_hand_completed(hand_record, seat_bot_ids)
+            except Exception:
+                # Persistence failures should not crash the match loop.
+                pass
 
     def get_leaderboard(self) -> dict:
         with self._lock:

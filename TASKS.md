@@ -301,10 +301,10 @@ Goal: replace single-table home with lobby + table pages and add persistent hist
   - Validate no regressions in table gameplay/hand history behavior. Done: found global runtime coupling that breaks per-table consistency expectations and stale lobby metadata behavior.
   - Acceptance: No unresolved high-severity consistency or regression issues remain. Result: not met; review outcome is **NO-GO** pending fixes documented in `docs/review_m6_t7_consistency_ux_regression.md`.
   - Test Strategy: Review checklist plus targeted rerun of affected tests. Done: `backend/.venv/bin/pytest backend/tests/test_api_endpoints.py backend/tests/test_frontend_auth_shell.py -q` (50 passed).
-- [ ] `M6-T8` Run release readiness checks for Batch 2 scope (owner: `release-agent`)
+- [x] `M6-T8` Run release readiness checks for Batch 2 scope (owner: `release-agent`)
   - Subtasks:
   - Run full repository validation and test suite.
   - Verify documentation and environment instructions match implemented behavior.
   - Summarize release blockers, residual risks, and deployment notes.
-  - Acceptance: Batch 2 readiness report is published with clear go/no-go decision.
-  - Test Strategy: End-to-end CI and local release checklist execution.
+  - Acceptance: Batch 2 readiness report is published with clear go/no-go decision. Done: published `docs/release_readiness_m6_t8.md` with **NO-GO** recommendation and blocker list.
+  - Test Strategy: End-to-end CI and local release checklist execution. Done: `scripts/validate_repo.sh` PASS, `scripts/bootstrap_venv.sh` PASS, `scripts/run_backend_pytest.sh` PASS (97 passed).

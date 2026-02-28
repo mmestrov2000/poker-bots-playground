@@ -13,6 +13,8 @@
   const leaderboardList = document.getElementById("lobby-leaderboard-list");
 
   let refreshTimer = null;
+  let createRequestInFlight = false;
+  let knownTables = [];
 
   function showCreateFeedback(message, type = "info") {
     if (!createTableFeedback) {
@@ -66,11 +68,48 @@
     return table.state || table.status || "waiting";
   }
 
+  function normalizeTable(table) {
+    const tableId = table?.table_id || table?.tableId;
+    if (!tableId) {
+      return null;
+    }
+    const status = extractTableStatus(table);
+    const createdAt = table.created_at || table.createdAt || null;
+    return {
+      table_id: tableId,
+      state: status,
+      status,
+      small_blind: Number(table.small_blind ?? table.smallBlind ?? 0.5),
+      big_blind: Number(table.big_blind ?? table.bigBlind ?? 1),
+      seats_filled: extractSeatsFilled(table),
+      max_seats: Number(table.max_seats ?? table.maxSeats ?? 6),
+      created_at: createdAt,
+    };
+  }
+
+  function setCreateSubmitting(isSubmitting) {
+    createRequestInFlight = isSubmitting;
+    if (!createTableForm || !createTableSubmit) {
+      return;
+    }
+    createTableSubmit.disabled = isSubmitting;
+    createTableSubmit.textContent = isSubmitting ? "Creating..." : "Create Table";
+    const inputs = createTableForm.querySelectorAll("input, button");
+    inputs.forEach((element) => {
+      element.disabled = isSubmitting;
+    });
+  }
+
+  async function refreshTablesOnly() {
+    await loadTables();
+  }
+
   function renderTables(tables) {
     if (!tablesBody || !tablesTable || !tablesState) {
       return;
     }
 
+    knownTables = tables.slice();
     tablesBody.innerHTML = "";
     if (!tables.length) {
       tablesState.textContent = "No tables yet. Create one to get started.";
@@ -196,12 +235,12 @@
       return;
     }
 
-    if (bigBlind < smallBlind) {
-      showCreateFeedback("Big blind must be greater than or equal to small blind.", "error");
+    if (bigBlind <= smallBlind) {
+      showCreateFeedback("Big blind must be greater than small blind.", "error");
       return;
     }
 
-    createTableSubmit.disabled = true;
+    setCreateSubmitting(true);
     try {
       const response = await window.AppShell.request("/lobby/tables", {
         method: "POST",
@@ -215,25 +254,33 @@
       });
 
       const table = response.table;
-      const tableId = table?.table_id || table?.tableId;
-      showCreateFeedback("Table created successfully.", "success");
-      await refreshLobbyData();
-
-      if (tableId) {
-        window.location.assign(`/tables/${encodeURIComponent(tableId)}`);
+      const normalizedTable = normalizeTable(table);
+      if (normalizedTable) {
+        knownTables = [normalizedTable, ...knownTables.filter((item) => item.table_id !== normalizedTable.table_id)];
+        renderTables(knownTables);
       }
+      showCreateFeedback("Table created successfully. It is now listed below.", "success");
+      await refreshTablesOnly();
+      loadLeaderboard().catch((error) => {
+        console.error(error);
+      });
     } catch (error) {
       showCreateFeedback(error.message || "Failed to create table.", "error");
     } finally {
-      createTableSubmit.disabled = false;
+      setCreateSubmitting(false);
     }
   }
 
   function bindEvents() {
     createTableForm?.addEventListener("submit", (event) => {
+      if (createRequestInFlight) {
+        event.preventDefault();
+        return;
+      }
       handleCreateTableSubmit(event).catch((error) => {
         console.error(error);
         showCreateFeedback("Failed to create table.", "error");
+        setCreateSubmitting(false);
       });
     });
 

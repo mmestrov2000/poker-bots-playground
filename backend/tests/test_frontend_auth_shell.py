@@ -243,11 +243,15 @@ def test_frontend_lobby_script_smoke_for_seat_select_and_inline_create():
     assert 'window.AppShell.request("/lobby/tables")' in lobby_js
     assert 'window.AppShell.request("/lobby/tables", {' in lobby_js
     assert 'window.AppShell.request("/lobby/leaderboard")' in lobby_js
-    assert "window.location.assign(`/tables/${encodeURIComponent(tableId)}`)" in lobby_js
-    assert "Table created successfully." in lobby_js
+    assert "setCreateSubmitting(true);" in lobby_js
+    assert "setCreateSubmitting(false);" in lobby_js
+    assert "Table created successfully. It is now listed below." in lobby_js
+    assert "await refreshTablesOnly();" in lobby_js
+    assert "knownTables = [normalizedTable" in lobby_js
     assert 'const tableId = table.table_id || table.tableId || "unknown";' in lobby_js
     assert "const candidates = [table.seats_filled, table.seatsFilled, table.ready_seats, table.readySeats];" in lobby_js
     assert 'return table.state || table.status || "waiting";' in lobby_js
+    assert 'showCreateFeedback("Big blind must be greater than small blind.", "error");' in lobby_js
     assert 'tablesState.textContent = "Failed to load tables."' in lobby_js
     assert 'leaderboardState.textContent = "Failed to load leaderboard."' in lobby_js
     assert "refreshLobbyData().catch((error) => {" in lobby_js

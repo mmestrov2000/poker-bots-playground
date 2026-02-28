@@ -449,15 +449,23 @@ def test_lobby_tables_list_and_create_success():
     assert table["small_blind"] == 0.5
     assert table["big_blind"] == 1.0
     assert table["status"] == "waiting"
+    assert table["state"] == "waiting"
     assert table["seats_filled"] == 0
     assert table["max_seats"] == 6
+    assert datetime.fromisoformat(table["created_at"]).tzinfo is not None
     assert "created_by_user_id" not in table
 
     listed = routes.list_lobby_tables(current_user=bob)
     assert len(listed["tables"]) == 1
-    assert listed["tables"][0]["table_id"] == table["table_id"]
-    assert listed["tables"][0]["small_blind"] == 0.5
-    assert listed["tables"][0]["big_blind"] == 1.0
+    listed_table = listed["tables"][0]
+    assert listed_table["table_id"] == table["table_id"]
+    assert listed_table["small_blind"] == 0.5
+    assert listed_table["big_blind"] == 1.0
+    assert listed_table["status"] == "waiting"
+    assert listed_table["state"] == "waiting"
+    assert listed_table["seats_filled"] == 0
+    assert listed_table["max_seats"] == 6
+    assert datetime.fromisoformat(listed_table["created_at"]).tzinfo is not None
 
 
 def test_lobby_tables_create_rejects_invalid_blinds():

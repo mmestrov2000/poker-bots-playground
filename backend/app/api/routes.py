@@ -111,11 +111,13 @@ def _format_bot_for_response(bot: dict) -> dict:
 
 def _format_table_for_response(record: dict) -> dict:
     created_at = datetime.fromtimestamp(record["created_at"], tz=timezone.utc).isoformat()
+    status = record["status"]
     return {
         "table_id": record["table_id"],
         "small_blind": float(record["small_blind"]),
         "big_blind": float(record["big_blind"]),
-        "status": record["status"],
+        "status": status,
+        "state": status,
         "seats_filled": 0,
         "max_seats": len(SEAT_ORDER),
         "created_at": created_at,

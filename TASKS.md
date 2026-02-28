@@ -308,3 +308,16 @@ Goal: replace single-table home with lobby + table pages and add persistent hist
   - Summarize release blockers, residual risks, and deployment notes.
   - Acceptance: Batch 2 readiness report is published with clear go/no-go decision. Done: published `docs/release_readiness_m6_t8.md` with **NO-GO** recommendation and blocker list.
   - Test Strategy: End-to-end CI and local release checklist execution. Done: `scripts/validate_repo.sh` PASS, `scripts/bootstrap_venv.sh` PASS, `scripts/run_backend_pytest.sh` PASS (97 passed).
+
+## Bugfix: Lobby Create-Table Live Refresh
+Goal: ensure create-table submit succeeds reliably and new tables appear immediately in lobby without manual reload.
+
+- [x] `BF-M6-T1` Fix Lobby create-table submit flow and live list refresh (owner: `feature-agent`)
+  - Subtasks:
+  - Align frontend create validation with backend constraints (`big_blind > small_blind`). Done in `frontend/lobby.js`.
+  - Improve create submit UX state handling (prevent duplicate submits, disable form while request is in-flight, restore state on completion). Done in `frontend/lobby.js` via `setCreateSubmitting`.
+  - Ensure create success updates lobby tables immediately in-session without navigation away from lobby. Done by optimistic in-memory insert + guaranteed tables refetch and rerender in `frontend/lobby.js`.
+  - Ensure backend create/list response includes fields consumed by lobby row rendering. Done in `backend/app/api/routes.py` by returning both `status` and `state` plus existing metadata.
+  - Add/update regression coverage for response shape and create-submit/list-refresh behavior. Done in `backend/tests/test_api_endpoints.py` and `backend/tests/test_frontend_auth_shell.py`.
+  - Acceptance: Clicking Create Table adds a visible row in lobby table list immediately and no manual reload is required.
+  - Test Strategy: Backend `pytest` suite including lobby API and frontend smoke checks.

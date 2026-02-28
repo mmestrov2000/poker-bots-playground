@@ -294,13 +294,13 @@ Goal: replace single-table home with lobby + table pages and add persistent hist
   - Add UI checks for table navigation and stale data handling. Done: frontend smoke tests assert `/tables/{table_id}` authenticated shell rendering and `lobby.js` stale-payload fallback + refresh failure handling.
   - Acceptance: Multi-table and leaderboard regressions are detected automatically.
   - Test Strategy: Extended backend `pytest` + frontend smoke suite in CI.
-- [ ] `M6-T7` Review Milestone 6 for data consistency and UX regressions (owner: `review-agent`)
+- [x] `M6-T7` Review Milestone 6 for data consistency and UX regressions (owner: `review-agent`)
   - Subtasks:
-  - Validate multi-table data isolation and routing correctness.
-  - Validate leaderboard metric correctness and sorting semantics.
-  - Validate no regressions in table gameplay/hand history behavior.
-  - Acceptance: No unresolved high-severity consistency or regression issues remain.
-  - Test Strategy: Review checklist plus targeted rerun of affected tests.
+  - Validate multi-table data isolation and routing correctness. Done: identified blocking isolation defects where `table_id` is ignored by seat-selection flow and table pages call global live endpoints.
+  - Validate leaderboard metric correctness and sorting semantics. Done: verified persistent ranking query semantics (`bb_per_hand`, `hands_played`, `updated_at`, `bot_id`) and flagged missing tie-breaker test coverage.
+  - Validate no regressions in table gameplay/hand history behavior. Done: found global runtime coupling that breaks per-table consistency expectations and stale lobby metadata behavior.
+  - Acceptance: No unresolved high-severity consistency or regression issues remain. Result: not met; review outcome is **NO-GO** pending fixes documented in `docs/review_m6_t7_consistency_ux_regression.md`.
+  - Test Strategy: Review checklist plus targeted rerun of affected tests. Done: `backend/.venv/bin/pytest backend/tests/test_api_endpoints.py backend/tests/test_frontend_auth_shell.py -q` (50 passed).
 - [ ] `M6-T8` Run release readiness checks for Batch 2 scope (owner: `release-agent`)
   - Subtasks:
   - Run full repository validation and test suite.

@@ -425,6 +425,18 @@ class AuthStore:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    def get_table_record(self, table_id: str) -> dict | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT table_id, created_by_user_id, small_blind, big_blind, status, created_at
+                FROM table_records
+                WHERE table_id = ?
+                """,
+                (table_id,),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
     def upsert_leaderboard_row(
         self,
         *,

@@ -17,7 +17,7 @@ def _write_bot_zip(tmp_path: Path, name: str, body: str) -> Path:
 
 
 def test_registering_both_seats_starts_match(tmp_path: Path) -> None:
-    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    service = MatchService(table_id="table-1", hand_store=HandStore(base_dir=tmp_path / "hands"))
     service.HAND_INTERVAL_SECONDS = 0.05
 
     bot_body = "\n".join(
@@ -66,7 +66,7 @@ def test_registering_both_seats_starts_match(tmp_path: Path) -> None:
 
 
 def test_reset_match_clears_state(tmp_path: Path) -> None:
-    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    service = MatchService(table_id="table-1", hand_store=HandStore(base_dir=tmp_path / "hands"))
     service.HAND_INTERVAL_SECONDS = 0.05
 
     bot_body = "\n".join(
@@ -99,7 +99,7 @@ def test_reset_match_clears_state(tmp_path: Path) -> None:
 
 
 def test_list_hands_paginates_with_snapshot(tmp_path: Path) -> None:
-    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    service = MatchService(table_id="table-1", hand_store=HandStore(base_dir=tmp_path / "hands"))
     now = datetime.now(timezone.utc)
     with service._lock:
         service._hands = [
@@ -128,7 +128,7 @@ def test_list_hands_paginates_with_snapshot(tmp_path: Path) -> None:
 
 
 def test_list_pnl_returns_deltas_and_last_hand_id(tmp_path: Path) -> None:
-    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    service = MatchService(table_id="table-1", hand_store=HandStore(base_dir=tmp_path / "hands"))
     now = datetime.now(timezone.utc)
     with service._lock:
         service._hands = [
@@ -280,7 +280,7 @@ def test_list_pnl_returns_deltas_and_last_hand_id(tmp_path: Path) -> None:
     ],
 )
 def test_runtime_supervisor_contains_bad_bots(tmp_path: Path, bot_body: str) -> None:
-    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    service = MatchService(table_id="table-1", hand_store=HandStore(base_dir=tmp_path / "hands"))
     service.HAND_INTERVAL_SECONDS = 0.01
 
     stable_bot = "\n".join(
@@ -323,6 +323,7 @@ def test_match_loop_runtime_error_stops_match_safely(tmp_path: Path) -> None:
             raise RuntimeError("engine failure")
 
     service = MatchService(
+        table_id="table-1",
         hand_store=HandStore(base_dir=tmp_path / "hands"),
         engine=ExplodingEngine(),
     )
@@ -349,7 +350,7 @@ def test_match_loop_runtime_error_stops_match_safely(tmp_path: Path) -> None:
 
 
 def test_leaderboard_sorts_by_bb_per_hand(tmp_path: Path) -> None:
-    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    service = MatchService(table_id="table-1", hand_store=HandStore(base_dir=tmp_path / "hands"))
     now = datetime.now(timezone.utc)
     with service._lock:
         service._seats["1"].bot_name = "alpha"

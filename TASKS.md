@@ -321,3 +321,14 @@ Goal: ensure create-table submit succeeds reliably and new tables appear immedia
   - Add/update regression coverage for response shape and create-submit/list-refresh behavior. Done in `backend/tests/test_api_endpoints.py` and `backend/tests/test_frontend_auth_shell.py`.
   - Acceptance: Clicking Create Table adds a visible row in lobby table list immediately and no manual reload is required.
   - Test Strategy: Backend `pytest` suite including lobby API and frontend smoke checks.
+## Bugfix: Table Runtime Isolation
+Goal: ensure each lobby table opens and stays on its own isolated runtime state instead of drifting into another table's live data.
+
+- [x] `BF-M6-T2` Fix per-table live view isolation for table detail pages (owner: `feature-agent`)
+  - Subtasks:
+  - Add table-scoped live APIs for seats, match state/control, hands, hand detail, P&L, and in-table leaderboard. Done in `backend/app/api/routes.py`.
+  - Back each persisted lobby table with its own runtime service and hand-history storage. Done via `backend/app/services/table_runtime_manager.py` and `backend/app/services/match_service.py`.
+  - Route seat assignment and live polling by `table_id` so opening table B cannot surface table A state. Done in `frontend/table-detail.js`.
+  - Add regression coverage for multi-table isolation and table-detail frontend endpoint wiring. Done in `backend/tests/test_api_endpoints.py` and `backend/tests/test_frontend_auth_shell.py`.
+  - Acceptance: Opening a selected table consistently shows that table's own seats, match state, hands, P&L, and leaderboard.
+  - Test Strategy: Backend `pytest` suite with multi-table API isolation checks and frontend smoke assertions.

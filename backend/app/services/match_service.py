@@ -59,10 +59,12 @@ class MatchService:
 
     def __init__(
         self,
+        table_id: str,
         hand_store: HandStore,
         engine: PokerEngine | None = None,
         on_hand_completed: Callable[[HandRecord, dict[SeatId, str]], None] | None = None,
     ) -> None:
+        self.table_id = table_id
         self.hand_store = hand_store
         self.engine = engine or PokerEngine()
         self._on_hand_completed = on_hand_completed
@@ -86,6 +88,7 @@ class MatchService:
     def get_match(self) -> dict:
         with self._lock:
             return {
+                "table_id": self.table_id,
                 "status": self._status,
                 "started_at": self._started_at.isoformat() if self._started_at else None,
                 "hands_played": len(self._hands),
@@ -248,7 +251,11 @@ class MatchService:
         if self._loop_thread and self._loop_thread.is_alive():
             return
         self._stop_event.clear()
-        self._loop_thread = Thread(target=self._run_match_loop, daemon=True, name="match-loop")
+        self._loop_thread = Thread(
+            target=self._run_match_loop,
+            daemon=True,
+            name=f"match-loop-{self.table_id}",
+        )
         self._loop_thread.start()
 
     def _run_match_loop(self) -> None:
@@ -293,6 +300,7 @@ class MatchService:
             bots=bots,
             seat_names=seat_names,
             button=button,
+            table_id=self.table_id,
         )
         history = format_hand_history(
             hand_id=hand_id,

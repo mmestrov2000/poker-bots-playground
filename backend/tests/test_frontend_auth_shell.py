@@ -13,13 +13,25 @@ from app.auth.service import AuthService
 from app.auth.store import AuthStore
 from app.main import create_app
 from app.services.match_service import MatchService
+from app.services.table_runtime_manager import TableRuntimeManager
 from app.storage.hand_store import HandStore
+
+
+def build_runtime_callback(table_id: str, small_blind: float, big_blind: float):
+    del table_id
+    del small_blind
+    return lambda hand, seat_bot_ids: routes._update_persistent_leaderboard(
+        hand,
+        seat_bot_ids,
+        big_blind=big_blind,
+    )
 
 
 @pytest.fixture(autouse=True)
 def isolate_route_state(tmp_path, monkeypatch):
     uploads_dir = tmp_path / "uploads"
     uploads_dir.mkdir(parents=True, exist_ok=True)
+    hands_root = tmp_path / "hands"
 
     settings = AuthSettings(
         session_cookie_name="ppg_session",
@@ -36,9 +48,29 @@ def isolate_route_state(tmp_path, monkeypatch):
     auth_service.ensure_user("alice", "correct-horse-battery-staple")
 
     monkeypatch.setattr(routes, "uploads_dir", uploads_dir)
-    monkeypatch.setattr(routes, "match_service", MatchService(hand_store=HandStore(base_dir=tmp_path / "hands")))
+    monkeypatch.setattr(
+        routes,
+        "match_service",
+        MatchService(
+            table_id="default",
+            hand_store=HandStore(base_dir=hands_root / "default"),
+            on_hand_completed=build_runtime_callback("default", 0.5, 1.0),
+        ),
+    )
+    monkeypatch.setattr(
+        routes,
+        "table_runtime_manager",
+        TableRuntimeManager(
+            hands_root=hands_root,
+            on_hand_completed_factory=build_runtime_callback,
+        ),
+    )
     monkeypatch.setattr(routes, "auth_settings", settings)
     monkeypatch.setattr(routes, "auth_service", auth_service)
+    yield
+    routes.match_service.reset_match()
+    for table_service in routes.table_runtime_manager._services.values():
+        table_service.reset_match()
 
 
 def build_request_with_cookies(cookies: dict[str, str] | None = None) -> Request:
@@ -260,11 +292,13 @@ def test_frontend_table_detail_script_smoke_for_table_route_and_live_interaction
     table_detail_js = (frontend_dir / "table-detail.js").read_text(encoding="utf-8")
 
     assert "window.location.pathname.match(/^\\/tables\\/([^/]+)$/)" in table_detail_js
-    assert "window.AppShell.request(`/tables/${encodeURIComponent(tableId)}/seats/${activeSeatId}/bot-select`" in table_detail_js
-    assert "`/hands?${params.toString()}`" in table_detail_js
-    assert "`/hands/${handId}`" in table_detail_js
-    assert 'window.AppShell.request(`/pnl${query ? `?${query}` : ""}`)' in table_detail_js
-    assert 'window.AppShell.request("/leaderboard")' in table_detail_js
+    assert "function tableApiPath(path)" in table_detail_js
+    assert 'window.AppShell.request(`${tableApiPath(`/seats/${activeSeatId}/bot-select`)}`' in table_detail_js
+    assert 'window.AppShell.request(`${tableApiPath("/hands")}?${params.toString()}`)' in table_detail_js
+    assert 'window.AppShell.request(tableApiPath(`/hands/${encodeURIComponent(handId)}`))' in table_detail_js
+    assert 'window.AppShell.request(`${tableApiPath("/pnl")}${query ? `?${query}` : ""}`)' in table_detail_js
+    assert 'window.AppShell.request(tableApiPath("/leaderboard"))' in table_detail_js
+    assert 'window.AppShell.request(tableApiPath("/match"))' in table_detail_js
 
 
 def test_frontend_login_redirect_for_protected_pages():

@@ -34,6 +34,13 @@
     }
   })();
 
+  function tableApiPath(path) {
+    if (!tableId) {
+      throw new Error("Table route is invalid.");
+    }
+    return `/tables/${encodeURIComponent(tableId)}${path}`;
+  }
+
   const handDetailTabs = {
     logs: document.getElementById("hand-detail-logs"),
     replay: document.getElementById("hand-detail-replay"),
@@ -277,7 +284,7 @@
         params.set("since_hand_id", pnlLastHandId.toString());
       }
       const query = params.toString();
-      const response = await window.AppShell.request(`/pnl${query ? `?${query}` : ""}`);
+      const response = await window.AppShell.request(`${tableApiPath("/pnl")}${query ? `?${query}` : ""}`);
       const entries = response.entries ?? [];
       applyPnlEntries(entries);
       if (response.last_hand_id !== null && response.last_hand_id !== undefined) {
@@ -382,10 +389,7 @@
     if (!activeSeatId) {
       throw new Error("Select a seat first.");
     }
-    if (!tableId) {
-      throw new Error("Table route is invalid.");
-    }
-    await window.AppShell.request(`/tables/${encodeURIComponent(tableId)}/seats/${activeSeatId}/bot-select`, {
+    await window.AppShell.request(`${tableApiPath(`/seats/${activeSeatId}/bot-select`)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bot_id: botId }),
@@ -515,7 +519,7 @@
     if (snapshotMaxHandId !== null) {
       params.set("max_hand_id", snapshotMaxHandId.toString());
     }
-    const response = await window.AppShell.request(`/hands?${params.toString()}`);
+    const response = await window.AppShell.request(`${tableApiPath("/hands")}?${params.toString()}`);
     handsTotalHands = response.total_hands ?? 0;
     handsTotalPages = response.total_pages ?? (handsTotalHands ? Math.ceil(handsTotalHands / handsPageSize) : 0);
     renderHands(response.hands);
@@ -523,7 +527,7 @@
   }
 
   async function showHandHistory() {
-    const matchResponse = await window.AppShell.request("/match");
+    const matchResponse = await window.AppShell.request(tableApiPath("/match"));
     latestMatch = matchResponse.match;
     snapshotMaxHandId = latestMatch.hands_played;
     handHistoryVisible = true;
@@ -534,7 +538,7 @@
   }
 
   async function openHand(handId) {
-    const hand = await window.AppShell.request(`/hands/${handId}`);
+    const hand = await window.AppShell.request(tableApiPath(`/hands/${encodeURIComponent(handId)}`));
     selectedHandId = handId;
     handDetailText = hand.history || "No hand history available.";
     renderHandDetail();
@@ -563,9 +567,9 @@
   async function refreshState() {
     try {
       const [seats, match, leaderboard] = await Promise.all([
-        window.AppShell.request("/seats"),
-        window.AppShell.request("/match"),
-        window.AppShell.request("/leaderboard"),
+        window.AppShell.request(tableApiPath("/seats")),
+        window.AppShell.request(tableApiPath("/match")),
+        window.AppShell.request(tableApiPath("/leaderboard")),
       ]);
 
       const seatsReady = updateSeatStatus(seats.seats);
@@ -587,27 +591,27 @@
   }
 
   async function startMatch() {
-    await window.AppShell.request("/match/start", { method: "POST" });
+    await window.AppShell.request(tableApiPath("/match/start"), { method: "POST" });
     await refreshState();
   }
 
   async function pauseMatch() {
-    await window.AppShell.request("/match/pause", { method: "POST" });
+    await window.AppShell.request(tableApiPath("/match/pause"), { method: "POST" });
     await refreshState();
   }
 
   async function resumeMatch() {
-    await window.AppShell.request("/match/resume", { method: "POST" });
+    await window.AppShell.request(tableApiPath("/match/resume"), { method: "POST" });
     await refreshState();
   }
 
   async function endMatch() {
-    await window.AppShell.request("/match/end", { method: "POST" });
+    await window.AppShell.request(tableApiPath("/match/end"), { method: "POST" });
     await refreshState();
   }
 
   async function resetMatch() {
-    await window.AppShell.request("/match/reset", { method: "POST" });
+    await window.AppShell.request(tableApiPath("/match/reset"), { method: "POST" });
     clearHandDetail();
     clearHandHistory();
     resetPnlState();

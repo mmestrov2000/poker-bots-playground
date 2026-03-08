@@ -308,3 +308,15 @@ Goal: replace single-table home with lobby + table pages and add persistent hist
   - Summarize release blockers, residual risks, and deployment notes.
   - Acceptance: Batch 2 readiness report is published with clear go/no-go decision. Done: published `docs/release_readiness_m6_t8.md` with **NO-GO** recommendation and blocker list.
   - Test Strategy: End-to-end CI and local release checklist execution. Done: `scripts/validate_repo.sh` PASS, `scripts/bootstrap_venv.sh` PASS, `scripts/run_backend_pytest.sh` PASS (97 passed).
+
+## Bugfix: Table Runtime Isolation
+Goal: ensure each lobby table opens and stays on its own isolated runtime state instead of drifting into another table's live data.
+
+- [x] `BF-M6-T2` Fix per-table live view isolation for table detail pages (owner: `feature-agent`)
+  - Subtasks:
+  - Add table-scoped live APIs for seats, match state/control, hands, hand detail, P&L, and in-table leaderboard. Done in `backend/app/api/routes.py`.
+  - Back each persisted lobby table with its own runtime service and hand-history storage. Done via `backend/app/services/table_runtime_manager.py` and `backend/app/services/match_service.py`.
+  - Route seat assignment and live polling by `table_id` so opening table B cannot surface table A state. Done in `frontend/table-detail.js`.
+  - Add regression coverage for multi-table isolation and table-detail frontend endpoint wiring. Done in `backend/tests/test_api_endpoints.py` and `backend/tests/test_frontend_auth_shell.py`.
+  - Acceptance: Opening a selected table consistently shows that table's own seats, match state, hands, P&L, and leaderboard.
+  - Test Strategy: Backend `pytest` suite with multi-table API isolation checks and frontend smoke assertions.

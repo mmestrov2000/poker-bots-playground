@@ -13,8 +13,9 @@ from app.auth.store import AuthStore
 from app.bots.loader import BotLoadError, save_upload
 from app.bots.security import MAX_UPLOAD_BYTES
 from app.bots.validator import validate_bot_archive
-from app.engine.game import SEAT_ORDER
+from app.engine.game import PokerEngine, SEAT_ORDER
 from app.services.match_service import HandRecord, MatchService
+from app.services.table_runtime_manager import TableRuntimeManager
 from app.storage.hand_store import HandStore
 
 
@@ -22,13 +23,19 @@ router = APIRouter()
 repo_root = Path(__file__).resolve().parents[3]
 uploads_dir = repo_root / "runtime" / "uploads"
 uploads_dir.mkdir(parents=True, exist_ok=True)
+hands_dir = repo_root / "runtime" / "hands"
+hands_dir.mkdir(parents=True, exist_ok=True)
 
 auth_settings = AuthSettings.from_env(repo_root=repo_root)
 auth_service = AuthService(store=AuthStore(auth_settings.db_path), settings=auth_settings)
 
 
-def _update_persistent_leaderboard(hand: HandRecord, seat_bot_ids: dict[str, str]) -> None:
-    big_blind = match_service.engine.big_blind_cents / 100
+def _update_persistent_leaderboard(
+    hand: HandRecord,
+    seat_bot_ids: dict[str, str],
+    *,
+    big_blind: float,
+) -> None:
     if big_blind <= 0:
         return
 
@@ -49,7 +56,35 @@ def _update_persistent_leaderboard(hand: HandRecord, seat_bot_ids: dict[str, str
         )
 
 
-match_service = MatchService(hand_store=HandStore(), on_hand_completed=_update_persistent_leaderboard)
+def _build_leaderboard_callback(
+    table_id: str,
+    small_blind: float,
+    big_blind: float,
+):
+    del table_id
+    del small_blind
+    return lambda hand, seat_bot_ids: _update_persistent_leaderboard(
+        hand,
+        seat_bot_ids,
+        big_blind=big_blind,
+    )
+
+
+_default_engine = PokerEngine()
+match_service = MatchService(
+    table_id="default",
+    hand_store=HandStore(base_dir=hands_dir / "default"),
+    engine=_default_engine,
+    on_hand_completed=_build_leaderboard_callback(
+        table_id="default",
+        small_blind=_default_engine.small_blind_cents / 100,
+        big_blind=_default_engine.big_blind_cents / 100,
+    ),
+)
+table_runtime_manager = TableRuntimeManager(
+    hands_root=hands_dir,
+    on_hand_completed_factory=_build_leaderboard_callback,
+)
 
 
 class LoginRequest(BaseModel):
@@ -109,14 +144,29 @@ def _format_bot_for_response(bot: dict) -> dict:
     }
 
 
-def _format_table_for_response(record: dict) -> dict:
+def _summarize_table_runtime(service: MatchService | None) -> dict | None:
+    if service is None:
+        return None
+    match = service.get_match()
+    seats_filled = sum(1 for seat in service.get_seats() if seat["ready"])
+    return {
+        "status": match["status"],
+        "seats_filled": seats_filled,
+    }
+
+
+def _format_table_for_response(record: dict, service: MatchService | None = None) -> dict:
     created_at = datetime.fromtimestamp(record["created_at"], tz=timezone.utc).isoformat()
+    runtime = _summarize_table_runtime(service)
+    status = runtime["status"] if runtime is not None else record["status"]
+    seats_filled = runtime["seats_filled"] if runtime is not None else 0
     return {
         "table_id": record["table_id"],
         "small_blind": float(record["small_blind"]),
         "big_blind": float(record["big_blind"]),
-        "status": record["status"],
-        "seats_filled": 0,
+        "status": status,
+        "state": status,
+        "seats_filled": seats_filled,
         "max_seats": len(SEAT_ORDER),
         "created_at": created_at,
     }
@@ -146,6 +196,33 @@ def require_owned_bot(bot_id: str, current_user: dict) -> dict:
     if bot["owner_user_id"] != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
     return bot
+
+
+def require_existing_table(table_id: str) -> dict:
+    table = auth_service.store.get_table_record(table_id)
+    if table is None:
+        raise HTTPException(status_code=404, detail="Table not found")
+    return table
+
+
+def get_table_service(table_id: str) -> tuple[dict, MatchService]:
+    if table_id == "default":
+        return (
+            {
+                "table_id": "default",
+                "small_blind": match_service.engine.small_blind_cents / 100,
+                "big_blind": match_service.engine.big_blind_cents / 100,
+                "status": match_service.get_match()["status"],
+            },
+            match_service,
+        )
+    table = require_existing_table(table_id)
+    service = table_runtime_manager.get_or_create_service(
+        table_id=table["table_id"],
+        small_blind=float(table["small_blind"]),
+        big_blind=float(table["big_blind"]),
+    )
+    return table, service
 
 
 @router.get("/health")
@@ -274,7 +351,13 @@ async def upload_my_bot(
 @router.get("/lobby/tables")
 def list_lobby_tables(current_user: dict = Depends(require_authenticated_user)) -> dict:
     records = auth_service.store.list_table_records()
-    tables = [_format_table_for_response(record) for record in records]
+    tables = [
+        _format_table_for_response(
+            record,
+            service=table_runtime_manager.get_service_if_loaded(record["table_id"]),
+        )
+        for record in records
+    ]
     return {"tables": tables, "user": current_user}
 
 
@@ -297,7 +380,8 @@ def create_lobby_table(
         status="waiting",
         now_ts=now_ts,
     )
-    return {"table": _format_table_for_response(record), "user": current_user}
+    _, service = get_table_service(record["table_id"])
+    return {"table": _format_table_for_response(record, service=service), "user": current_user}
 
 
 @router.get("/lobby/leaderboard")
@@ -325,8 +409,9 @@ def select_bot_for_seat(
     if not artifact_path.exists():
         raise HTTPException(status_code=400, detail="Bot artifact is unavailable")
 
+    _, service = get_table_service(table_id)
     try:
-        seat = match_service.register_bot(
+        seat = service.register_bot(
             normalized_seat,
             bot["name"],
             bot_path=artifact_path,
@@ -335,7 +420,147 @@ def select_bot_for_seat(
     except BotLoadError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return {"seat": seat, "match": match_service.get_match(), "bot": _format_bot_for_response(bot)}
+    return {"seat": seat, "match": service.get_match(), "bot": _format_bot_for_response(bot)}
+
+
+@router.get("/tables/{table_id}/seats")
+def get_table_seats(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    del current_user
+    _, service = get_table_service(table_id)
+    return {"seats": service.get_seats()}
+
+
+@router.get("/tables/{table_id}/match")
+def get_table_match(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    del current_user
+    _, service = get_table_service(table_id)
+    return {"match": service.get_match()}
+
+
+def _run_table_match_action(table_id: str, action: str) -> dict:
+    _, service = get_table_service(table_id)
+    try:
+        getattr(service, action)()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"match": service.get_match()}
+
+
+@router.post("/tables/{table_id}/match/start")
+def start_table_match(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    del current_user
+    return _run_table_match_action(table_id, "start_match")
+
+
+@router.post("/tables/{table_id}/match/pause")
+def pause_table_match(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    del current_user
+    return _run_table_match_action(table_id, "pause_match")
+
+
+@router.post("/tables/{table_id}/match/resume")
+def resume_table_match(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    del current_user
+    return _run_table_match_action(table_id, "resume_match")
+
+
+@router.post("/tables/{table_id}/match/end")
+def end_table_match(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    del current_user
+    return _run_table_match_action(table_id, "end_match")
+
+
+@router.post("/tables/{table_id}/match/reset")
+def reset_table_match(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    del current_user
+    _, service = get_table_service(table_id)
+    service.reset_match()
+    return {"match": service.get_match()}
+
+
+@router.get("/tables/{table_id}/hands")
+def list_table_hands(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+    limit: Annotated[int | None, Query(ge=1, le=1000)] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=1000)] = 100,
+    max_hand_id: Annotated[int | None, Query(ge=0)] = None,
+) -> dict:
+    del current_user
+    _, service = get_table_service(table_id)
+    if limit is not None:
+        page_size = limit
+        page = 1
+    hands = service.list_hands(limit=limit, page=page, page_size=page_size, max_hand_id=max_hand_id)
+    total_hands = service.get_match()["hands_played"]
+    if max_hand_id is not None:
+        total_hands = min(max_hand_id, total_hands)
+    total_pages = math.ceil(total_hands / page_size) if total_hands else 0
+    return {
+        "hands": hands,
+        "page": page,
+        "page_size": page_size,
+        "total_hands": total_hands,
+        "total_pages": total_pages,
+    }
+
+
+@router.get("/tables/{table_id}/pnl")
+def get_table_pnl(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+    since_hand_id: Annotated[int | None, Query(ge=0)] = None,
+) -> dict:
+    del current_user
+    _, service = get_table_service(table_id)
+    entries, last_hand_id = service.list_pnl(since_hand_id=since_hand_id)
+    return {"entries": entries, "last_hand_id": last_hand_id}
+
+
+@router.get("/tables/{table_id}/leaderboard")
+def get_table_leaderboard(
+    table_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    del current_user
+    _, service = get_table_service(table_id)
+    return service.get_leaderboard()
+
+
+@router.get("/tables/{table_id}/hands/{hand_id}")
+def get_table_hand(
+    table_id: str,
+    hand_id: str,
+    current_user: dict = Depends(require_authenticated_user),
+) -> dict:
+    del current_user
+    _, service = get_table_service(table_id)
+    hand = service.get_hand(hand_id)
+    if hand is None:
+        raise HTTPException(status_code=404, detail="Hand not found")
+    return hand
 
 
 @router.get("/seats")

@@ -13,6 +13,7 @@ from starlette.requests import Request
 
 from app.api import routes
 from app.services.match_service import HandRecord, MatchService
+from app.services.table_runtime_manager import TableRuntimeManager
 from app.auth.config import AuthSettings
 from app.auth.service import AuthError, AuthLockedError
 from app.auth.service import AuthService
@@ -41,12 +42,31 @@ def build_upload_file(filename: str, payload: bytes) -> FakeUploadFile:
     return FakeUploadFile(filename=filename, payload=payload)
 
 
+def build_runtime_callback(table_id: str, small_blind: float, big_blind: float):
+    del table_id
+    del small_blind
+    return lambda hand, seat_bot_ids: routes._update_persistent_leaderboard(
+        hand,
+        seat_bot_ids,
+        big_blind=big_blind,
+    )
+
+
 @pytest.fixture(autouse=True)
 def isolate_route_state(tmp_path, monkeypatch):
     uploads_dir = tmp_path / "uploads"
     uploads_dir.mkdir(parents=True, exist_ok=True)
-    service = MatchService(hand_store=HandStore(base_dir=tmp_path / "hands"))
+    hands_root = tmp_path / "hands"
+    service = MatchService(
+        table_id="default",
+        hand_store=HandStore(base_dir=hands_root / "default"),
+        on_hand_completed=build_runtime_callback("default", 0.5, 1.0),
+    )
     service.HAND_INTERVAL_SECONDS = 0.01
+    table_runtime_manager = TableRuntimeManager(
+        hands_root=hands_root,
+        on_hand_completed_factory=build_runtime_callback,
+    )
     settings = AuthSettings(
         session_cookie_name="ppg_session",
         session_cookie_secure=None,
@@ -63,11 +83,13 @@ def isolate_route_state(tmp_path, monkeypatch):
 
     monkeypatch.setattr(routes, "uploads_dir", uploads_dir)
     monkeypatch.setattr(routes, "match_service", service)
+    monkeypatch.setattr(routes, "table_runtime_manager", table_runtime_manager)
     monkeypatch.setattr(routes, "auth_settings", settings)
     monkeypatch.setattr(routes, "auth_service", auth_service)
-    service._on_hand_completed = routes._update_persistent_leaderboard
     yield
     service.reset_match()
+    for table_service in table_runtime_manager._services.values():
+        table_service.reset_match()
 
 
 def build_request_with_cookies(
@@ -449,15 +471,23 @@ def test_lobby_tables_list_and_create_success():
     assert table["small_blind"] == 0.5
     assert table["big_blind"] == 1.0
     assert table["status"] == "waiting"
+    assert table["state"] == "waiting"
     assert table["seats_filled"] == 0
     assert table["max_seats"] == 6
+    assert datetime.fromisoformat(table["created_at"]).tzinfo is not None
     assert "created_by_user_id" not in table
 
     listed = routes.list_lobby_tables(current_user=bob)
     assert len(listed["tables"]) == 1
-    assert listed["tables"][0]["table_id"] == table["table_id"]
-    assert listed["tables"][0]["small_blind"] == 0.5
-    assert listed["tables"][0]["big_blind"] == 1.0
+    listed_table = listed["tables"][0]
+    assert listed_table["table_id"] == table["table_id"]
+    assert listed_table["small_blind"] == 0.5
+    assert listed_table["big_blind"] == 1.0
+    assert listed_table["status"] == "waiting"
+    assert listed_table["state"] == "waiting"
+    assert listed_table["seats_filled"] == 0
+    assert listed_table["max_seats"] == 6
+    assert datetime.fromisoformat(listed_table["created_at"]).tzinfo is not None
 
 
 def test_lobby_tables_create_rejects_invalid_blinds():
@@ -500,8 +530,96 @@ def test_lobby_tables_support_multi_table_lifecycle_listing():
     assert set(listed_by_id) == created_ids
     for table_id in created_ids:
         assert listed_by_id[table_id]["status"] == "waiting"
+        assert listed_by_id[table_id]["state"] == "waiting"
         assert listed_by_id[table_id]["seats_filled"] == 0
         assert listed_by_id[table_id]["max_seats"] == 6
+
+
+@pytest.mark.anyio
+async def test_table_live_endpoints_are_isolated_per_table():
+    current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
+    payload = build_zip(
+        {
+            "bot.py": """
+class PokerBot:
+    def act(self, state):
+        return {"action": "check", "amount": 0}
+"""
+        }
+    )
+    alpha = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("alpha.zip", payload),
+        name="Alpha",
+        version="1.0.0",
+    )
+    beta = await routes.upload_my_bot(
+        current_user=current_user,
+        bot_file=build_upload_file("beta.zip", payload),
+        name="Beta",
+        version="1.0.0",
+    )
+
+    first_table = routes.create_lobby_table(
+        payload=routes.CreateLobbyTableRequest(small_blind=0.5, big_blind=1.0),
+        current_user=current_user,
+    )["table"]
+    second_table = routes.create_lobby_table(
+        payload=routes.CreateLobbyTableRequest(small_blind=1.0, big_blind=2.0),
+        current_user=current_user,
+    )["table"]
+
+    routes.select_bot_for_seat(
+        table_id=first_table["table_id"],
+        seat_id="1",
+        payload=routes.SelectBotRequest(bot_id=alpha["bot"]["bot_id"]),
+        current_user=current_user,
+    )
+    routes.select_bot_for_seat(
+        table_id=first_table["table_id"],
+        seat_id="2",
+        payload=routes.SelectBotRequest(bot_id=beta["bot"]["bot_id"]),
+        current_user=current_user,
+    )
+
+    _, first_service = routes.get_table_service(first_table["table_id"])
+    first_service.HAND_INTERVAL_SECONDS = 0.01
+    started = routes.start_table_match(first_table["table_id"], current_user=current_user)
+    assert started["match"]["table_id"] == first_table["table_id"]
+    assert started["match"]["status"] == "running"
+
+    deadline = time.monotonic() + 2.0
+    first_hands = []
+    while time.monotonic() < deadline:
+        first_hands = routes.list_table_hands(first_table["table_id"], current_user=current_user)["hands"]
+        if first_hands:
+            break
+        time.sleep(0.05)
+    assert first_hands
+
+    first_seats = routes.get_table_seats(first_table["table_id"], current_user=current_user)["seats"]
+    second_seats = routes.get_table_seats(second_table["table_id"], current_user=current_user)["seats"]
+    assert sum(1 for seat in first_seats if seat["ready"]) == 2
+    assert sum(1 for seat in second_seats if seat["ready"]) == 0
+
+    second_match = routes.get_table_match(second_table["table_id"], current_user=current_user)["match"]
+    assert second_match["table_id"] == second_table["table_id"]
+    assert second_match["status"] == "waiting"
+    assert second_match["hands_played"] == 0
+
+    second_hands = routes.list_table_hands(second_table["table_id"], current_user=current_user)["hands"]
+    assert second_hands == []
+
+    with pytest.raises(HTTPException) as missing_hand:
+        routes.get_table_hand(second_table["table_id"], "1", current_user=current_user)
+    assert missing_hand.value.status_code == 404
+
+    listed = routes.list_lobby_tables(current_user=current_user)["tables"]
+    listed_by_id = {table["table_id"]: table for table in listed}
+    assert listed_by_id[first_table["table_id"]]["seats_filled"] == 2
+    assert listed_by_id[first_table["table_id"]]["status"] == "running"
+    assert listed_by_id[second_table["table_id"]]["seats_filled"] == 0
+    assert listed_by_id[second_table["table_id"]]["status"] == "waiting"
 
 
 @pytest.mark.anyio

@@ -1,6 +1,4 @@
 (() => {
-  const apiBase = "/api/v1";
-
   const form = document.getElementById("auth-form");
   const usernameInput = document.getElementById("auth-username");
   const passwordInput = document.getElementById("auth-password");
@@ -16,27 +14,6 @@
 
   let authMode = "login";
   let submitting = false;
-
-  async function request(path, options = {}) {
-    const requestOptions = { ...options };
-    if (!requestOptions.credentials) {
-      requestOptions.credentials = "same-origin";
-    }
-    const response = await fetch(`${apiBase}${path}`, requestOptions);
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      const detail = payload.detail;
-      const message =
-        typeof detail === "string"
-          ? detail
-          : detail?.message || payload.message || `Request failed: ${response.status}`;
-      const error = new Error(message);
-      error.statusCode = response.status;
-      error.detail = detail;
-      throw error;
-    }
-    return response.json();
-  }
 
   function setTextMessage(element, message) {
     if (!element) {
@@ -63,6 +40,7 @@
   function setSubmitting(isSubmitting) {
     submitting = isSubmitting;
     submitButton.disabled = isSubmitting;
+    form?.setAttribute("aria-busy", isSubmitting ? "true" : "false");
     if (isSubmitting) {
       submitButton.textContent = authMode === "register" ? "Creating account..." : "Logging in...";
       return;
@@ -72,6 +50,7 @@
 
   function setMode(mode) {
     authMode = mode;
+    form?.setAttribute("data-mode", mode);
     modeLoginButton.classList.toggle("active", mode === "login");
     modeRegisterButton.classList.toggle("active", mode === "register");
     subtitle.textContent =
@@ -120,17 +99,21 @@
     setSubmitting(true);
     try {
       const endpoint = authMode === "register" ? "/auth/register" : "/auth/login";
-      await request(endpoint, {
+      await window.AppShell.request(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
       if (authMode === "register") {
         setTextMessage(formSuccess, "Account created successfully. Signing you in...");
+        window.AppShell.notify("Account created. Redirecting to the lobby.", "success", { timeoutMs: 1200 });
       }
-      window.setTimeout(() => {
-        window.location.assign("/lobby");
-      }, authMode === "register" ? 650 : 0);
+      window.setTimeout(
+        () => {
+          window.location.assign("/lobby");
+        },
+        authMode === "register" ? 650 : 0
+      );
     } catch (error) {
       if (error.statusCode === 401) {
         setTextMessage(formError, "Invalid username or password.");
@@ -153,13 +136,13 @@
     setMode("login");
 
     try {
-      await request("/auth/me");
-      window.location.replace("/lobby");
-      return;
-    } catch (error) {
-      if (error.statusCode !== 401) {
-        setTextMessage(formError, "Unable to verify current session.");
+      const currentUser = await window.AppShell.getCurrentUser({ redirectOn401: false });
+      if (currentUser) {
+        window.location.replace("/lobby");
+        return;
       }
+    } catch (error) {
+      setTextMessage(formError, "Unable to verify current session.");
     }
 
     modeLoginButton.addEventListener("click", () => setMode("login"));

@@ -1,0 +1,11 @@
+{
+  "name": "poker-bots-playground",
+  "private": true,
+  "scripts": {
+    "install:e2e:browser": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium",
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  }
+}

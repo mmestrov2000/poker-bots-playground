@@ -8,6 +8,11 @@ backend/.venv/
 .env
 .worktrees/
 *.code-workspace
+node_modules/
+.playwright-browsers/
+playwright-report/
+test-results/
+.playwright-runtime/
 runtime/uploads/*
 runtime/hands/*
 runtime/auth.sqlite3

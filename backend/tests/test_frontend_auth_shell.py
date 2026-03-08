@@ -151,6 +151,9 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'id="auth-form"' in login_html
     assert 'id="auth-mode-login"' in login_html
     assert 'id="auth-mode-register"' in login_html
+    assert 'data-testid="auth-card"' in login_html
+    assert 'data-testid="auth-hero"' in login_html
+    assert "/static/app-shell.js" in login_html
     assert "/static/login.js" in login_html
 
     assert 'id="nav-lobby"' in lobby_html
@@ -167,18 +170,23 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'id="create-table-feedback"' in lobby_html
     assert 'id="lobby-tables-state"' in lobby_html
     assert 'id="lobby-tables-body"' in lobby_html
+    assert 'id="lobby-table-cards"' in lobby_html
     assert 'id="lobby-leaderboard-state"' in lobby_html
     assert 'id="lobby-leaderboard-list"' in lobby_html
 
     # Table detail page renders the live gameplay experience.
     assert 'id="table-id-label"' in table_detail_html
+    assert 'id="table-status-pill"' in table_detail_html
     assert 'id="seat-1-name"' in table_detail_html
+    assert 'id="seat-1-status"' in table_detail_html
     assert 'id="seat-6-name"' in table_detail_html
     assert 'id="start-match"' in table_detail_html
     assert 'id="hands-list"' in table_detail_html
     assert 'id="hand-detail"' in table_detail_html
     assert 'id="pnl-chart"' in table_detail_html
     assert 'id="leaderboard-list"' in table_detail_html
+    assert 'data-testid="poker-table"' in table_detail_html
+    assert 'data-testid="seat-existing-bot-id"' in table_detail_html
     assert "/static/table-detail.js" in table_detail_html
 
     assert 'id="my-bots-list"' in my_bots_html
@@ -189,6 +197,7 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'id="my-bots-upload-submit"' in my_bots_html
     assert 'id="my-bots-upload-feedback"' in my_bots_html
     assert 'id="my-bots-state"' in my_bots_html
+    assert 'data-testid="my-bots-list"' in my_bots_html
     assert "/static/my-bots.js" in my_bots_html
 
 
@@ -292,6 +301,7 @@ def test_frontend_my_bots_script_smoke_for_page_load_upload_and_states():
     assert 'method: "POST"' in my_bots_js
     assert "Upload successful" in my_bots_js
     assert "await loadBots()" in my_bots_js
+    assert 'window.AppShell.notify(`Upload successful: ${uploadedName}`' in my_bots_js
 
     # Error handling and explicit loading/empty/error states.
     assert "Loading bots..." in my_bots_js
@@ -310,17 +320,16 @@ def test_frontend_lobby_script_smoke_for_seat_select_and_inline_create():
     assert "setCreateSubmitting(true);" in lobby_js
     assert "setCreateSubmitting(false);" in lobby_js
     assert "Table created successfully. It is now listed below." in lobby_js
-    assert "await refreshTablesOnly();" in lobby_js
     assert "knownTables = [normalizedTable" in lobby_js
-    assert 'const tableId = table.table_id || table.tableId || "unknown";' in lobby_js
+    assert "const nextSignature = buildTablesSignature(normalizedTables);" in lobby_js
+    assert 'const tableCards = document.getElementById("lobby-table-cards");' in lobby_js
     assert "const candidates = [table.seats_filled, table.seatsFilled, table.ready_seats, table.readySeats];" in lobby_js
     assert 'return table.state || table.status || "waiting";' in lobby_js
     assert 'showCreateFeedback("Big blind must be greater than small blind.", "error");' in lobby_js
     assert 'tablesState.textContent = "Failed to load tables."' in lobby_js
     assert 'leaderboardState.textContent = "Failed to load leaderboard."' in lobby_js
-    assert "refreshLobbyData().catch((error) => {" in lobby_js
-    assert "window.setInterval(() => {" in lobby_js
-    assert "window.clearInterval(refreshTimer);" in lobby_js
+    assert "window.AppShell.notify(\"Table created successfully.\", \"success\")" in lobby_js
+    assert "window.AppShell.startAdaptivePolling(refreshLobbyData" in lobby_js
 
 
 def test_frontend_table_detail_script_smoke_for_table_route_and_live_interactions():
@@ -335,6 +344,36 @@ def test_frontend_table_detail_script_smoke_for_table_route_and_live_interaction
     assert 'window.AppShell.request(`${tableApiPath("/pnl")}${query ? `?${query}` : ""}`)' in table_detail_js
     assert 'window.AppShell.request(tableApiPath("/leaderboard"))' in table_detail_js
     assert 'window.AppShell.request(tableApiPath("/match"))' in table_detail_js
+    assert "window.AppShell.notify" in table_detail_js
+    assert "window.AppShell.startAdaptivePolling(refreshState" in table_detail_js
+    assert "function handleModalKeydown(event)" in table_detail_js
+    assert "function queuePnlRender(force = false)" in table_detail_js
+    assert "alert(" not in table_detail_js
+
+
+def test_frontend_app_shell_exposes_request_notify_and_adaptive_polling():
+    frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+    app_shell_js = (frontend_dir / "app-shell.js").read_text(encoding="utf-8")
+
+    assert 'const apiBase = "/api/v1";' in app_shell_js
+    assert "function notify(message, type = \"info\", options = {})" in app_shell_js
+    assert "function startAdaptivePolling(task, options = {})" in app_shell_js
+    assert "toast-region" in app_shell_js
+    assert "window.AppShell = {" in app_shell_js
+
+
+def test_playwright_frontend_suite_is_checked_in_with_runtime_isolation():
+    repo_root = Path(__file__).resolve().parents[2]
+    package_json = (repo_root / "package.json").read_text(encoding="utf-8")
+    playwright_config = (repo_root / "playwright.config.js").read_text(encoding="utf-8")
+    e2e_spec = (repo_root / "e2e" / "frontend-responsive.spec.js").read_text(encoding="utf-8")
+
+    assert '"install:e2e:browser": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium"' in package_json
+    assert '"test:e2e": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright test"' in package_json
+    assert "APP_RUNTIME_DIR=.playwright-runtime" in playwright_config
+    assert 'devices["Pixel 7"]' in playwright_config
+    assert "registerAndLandInLobby" in e2e_spec
+    assert "desktop and tablet can seat bots, run a match, and inspect history" in e2e_spec
 
 
 def test_frontend_login_redirect_for_protected_pages():

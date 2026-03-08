@@ -8,13 +8,16 @@
   const tablesState = document.getElementById("lobby-tables-state");
   const tablesTable = document.getElementById("lobby-tables-table");
   const tablesBody = document.getElementById("lobby-tables-body");
+  const tableCards = document.getElementById("lobby-table-cards");
 
   const leaderboardState = document.getElementById("lobby-leaderboard-state");
   const leaderboardList = document.getElementById("lobby-leaderboard-list");
 
-  let refreshTimer = null;
   let createRequestInFlight = false;
   let knownTables = [];
+  let stopPolling = null;
+  let tablesSignature = "";
+  let leaderboardSignature = "";
 
   function showCreateFeedback(message, type = "info") {
     if (!createTableFeedback) {
@@ -87,6 +90,36 @@
     };
   }
 
+  function buildTablesSignature(tables) {
+    return tables
+      .map((table) =>
+        [
+          table.table_id,
+          table.state,
+          table.small_blind,
+          table.big_blind,
+          table.seats_filled,
+          table.max_seats,
+          table.created_at,
+        ].join("|")
+      )
+      .join("||");
+  }
+
+  function buildLeaderboardSignature(leaderboard) {
+    return leaderboard
+      .map((entry) =>
+        [
+          entry.bot_id || entry.bot_name || entry.name,
+          entry.bb_per_hand,
+          entry.bb_won,
+          entry.hands_played,
+          entry.updated_at,
+        ].join("|")
+      )
+      .join("||");
+  }
+
   function setCreateSubmitting(isSubmitting) {
     createRequestInFlight = isSubmitting;
     if (!createTableForm || !createTableSubmit) {
@@ -94,64 +127,90 @@
     }
     createTableSubmit.disabled = isSubmitting;
     createTableSubmit.textContent = isSubmitting ? "Creating..." : "Create Table";
-    const inputs = createTableForm.querySelectorAll("input, button");
-    inputs.forEach((element) => {
+    createTableForm.setAttribute("aria-busy", isSubmitting ? "true" : "false");
+    createTableForm.querySelectorAll("input, button").forEach((element) => {
       element.disabled = isSubmitting;
     });
   }
 
-  async function refreshTablesOnly() {
-    await loadTables();
+  function createOpenButton(tableId, className = "button-secondary") {
+    const openButton = document.createElement("button");
+    openButton.type = "button";
+    openButton.className = className;
+    openButton.dataset.tableOpen = tableId;
+    openButton.setAttribute("data-testid", `open-table-${tableId}`);
+    openButton.textContent = "Open Table";
+    openButton.addEventListener("click", () => {
+      window.location.assign(`/tables/${encodeURIComponent(tableId)}`);
+    });
+    return openButton;
   }
 
   function renderTables(tables) {
-    if (!tablesBody || !tablesTable || !tablesState) {
+    if (!tablesBody || !tablesTable || !tablesState || !tableCards) {
       return;
     }
 
-    knownTables = tables.slice();
+    const normalizedTables = tables.map(normalizeTable).filter(Boolean);
+    const nextSignature = buildTablesSignature(normalizedTables);
+    knownTables = normalizedTables.slice();
+    if (nextSignature === tablesSignature) {
+      tablesState.classList.add("hidden");
+      tablesTable.classList.toggle("hidden", !normalizedTables.length);
+      tableCards.classList.toggle("hidden", !normalizedTables.length);
+      return;
+    }
+    tablesSignature = nextSignature;
+
     tablesBody.innerHTML = "";
-    if (!tables.length) {
+    tableCards.innerHTML = "";
+
+    if (!normalizedTables.length) {
       tablesState.textContent = "No tables yet. Create one to get started.";
       tablesState.classList.remove("hidden");
       tablesTable.classList.add("hidden");
+      tableCards.classList.add("hidden");
       return;
     }
 
-    tables.forEach((table) => {
+    normalizedTables.forEach((table) => {
       const row = document.createElement("tr");
-      const tableId = table.table_id || table.tableId || "unknown";
-      const smallBlind = Number(table.small_blind ?? table.smallBlind ?? 0.5);
-      const bigBlind = Number(table.big_blind ?? table.bigBlind ?? 1);
-      const seatsFilled = extractSeatsFilled(table);
-      const status = extractTableStatus(table);
-      const createdAt = table.created_at || table.createdAt;
-
-      const openButton = document.createElement("button");
-      openButton.type = "button";
-      openButton.className = "button-secondary";
-      openButton.dataset.tableOpen = tableId;
-      openButton.textContent = "Open";
-      openButton.addEventListener("click", () => {
-        window.location.assign(`/tables/${encodeURIComponent(tableId)}`);
-      });
-
+      row.dataset.testid = `table-row-${table.table_id}`;
       row.innerHTML = `
-        <td class="table-id">${tableId}</td>
-        <td>${formatNumber(smallBlind, 2)}/${formatNumber(bigBlind, 2)}</td>
-        <td>${seatsFilled}/6</td>
-        <td>${status}</td>
-        <td>${formatTimestamp(createdAt)}</td>
+        <td class="table-id">${table.table_id}</td>
+        <td>${formatNumber(table.small_blind, 2)}/${formatNumber(table.big_blind, 2)}</td>
+        <td>${table.seats_filled}/${table.max_seats}</td>
+        <td><span class="table-state-pill" data-state="${table.state}">${table.state}</span></td>
+        <td>${formatTimestamp(table.created_at)}</td>
       `;
-
       const actionCell = document.createElement("td");
-      actionCell.appendChild(openButton);
+      actionCell.appendChild(createOpenButton(table.table_id));
       row.appendChild(actionCell);
       tablesBody.appendChild(row);
+
+      const card = document.createElement("article");
+      card.className = "lobby-table-card";
+      card.dataset.testid = `table-card-${table.table_id}`;
+      card.innerHTML = `
+        <div class="lobby-table-card-header">
+          <div>
+            <p class="table-id">${table.table_id}</p>
+            <p class="lobby-card-meta">${formatNumber(table.small_blind, 2)}/${formatNumber(table.big_blind, 2)} blinds</p>
+          </div>
+          <span class="table-state-pill" data-state="${table.state}">${table.state}</span>
+        </div>
+        <div class="lobby-card-stats">
+          <p>${table.seats_filled}/${table.max_seats} seats filled</p>
+          <p>${formatTimestamp(table.created_at)}</p>
+        </div>
+      `;
+      card.appendChild(createOpenButton(table.table_id, "button-secondary button-full"));
+      tableCards.appendChild(card);
     });
 
     tablesState.classList.add("hidden");
     tablesTable.classList.remove("hidden");
+    tableCards.classList.remove("hidden");
   }
 
   function renderLeaderboard(leaderboard) {
@@ -159,7 +218,15 @@
       return;
     }
 
+    const nextSignature = buildLeaderboardSignature(leaderboard);
+    if (nextSignature === leaderboardSignature) {
+      leaderboardState.classList.toggle("hidden", Boolean(leaderboard.length));
+      leaderboardList.classList.toggle("hidden", !leaderboard.length);
+      return;
+    }
+    leaderboardSignature = nextSignature;
     leaderboardList.innerHTML = "";
+
     if (!leaderboard.length) {
       leaderboardState.textContent = "No leaderboard data yet.";
       leaderboardState.classList.remove("hidden");
@@ -170,6 +237,7 @@
     leaderboard.forEach((entry, index) => {
       const item = document.createElement("li");
       item.className = "lobby-leaderboard-item";
+      item.dataset.testid = `leaderboard-entry-${index + 1}`;
 
       const name = entry.bot_name || entry.name || entry.bot_id || "Unknown bot";
       const bbPerHand = formatNumber(entry.bb_per_hand, 3);
@@ -194,8 +262,10 @@
     if (!tablesState) {
       return;
     }
-    tablesState.textContent = "Loading tables...";
-    tablesState.classList.remove("hidden");
+    if (!knownTables.length) {
+      tablesState.textContent = "Loading tables...";
+      tablesState.classList.remove("hidden");
+    }
 
     const response = await window.AppShell.request("/lobby/tables");
     const tables = response.tables || [];
@@ -206,8 +276,10 @@
     if (!leaderboardState) {
       return;
     }
-    leaderboardState.textContent = "Loading leaderboard...";
-    leaderboardState.classList.remove("hidden");
+    if (leaderboardList.classList.contains("hidden")) {
+      leaderboardState.textContent = "Loading leaderboard...";
+      leaderboardState.classList.remove("hidden");
+    }
 
     const response = await window.AppShell.request("/lobby/leaderboard");
     const leaderboard = response.leaderboard || response.leaders || [];
@@ -253,19 +325,17 @@
         }),
       });
 
-      const table = response.table;
-      const normalizedTable = normalizeTable(table);
+      const normalizedTable = normalizeTable(response.table);
       if (normalizedTable) {
         knownTables = [normalizedTable, ...knownTables.filter((item) => item.table_id !== normalizedTable.table_id)];
         renderTables(knownTables);
       }
       showCreateFeedback("Table created successfully. It is now listed below.", "success");
-      await refreshTablesOnly();
-      loadLeaderboard().catch((error) => {
-        console.error(error);
-      });
+      window.AppShell.notify("Table created successfully.", "success");
+      await Promise.all([loadTables(), loadLeaderboard()]);
     } catch (error) {
       showCreateFeedback(error.message || "Failed to create table.", "error");
+      window.AppShell.notify(error.message || "Failed to create table.", "error");
     } finally {
       setCreateSubmitting(false);
     }
@@ -290,6 +360,7 @@
         if (tablesState) {
           tablesState.textContent = "Failed to load tables.";
         }
+        window.AppShell.notify("Failed to load tables.", "error");
       });
     });
 
@@ -299,6 +370,7 @@
         if (leaderboardState) {
           leaderboardState.textContent = "Failed to load leaderboard.";
         }
+        window.AppShell.notify("Failed to load leaderboard.", "error");
       });
     });
   }
@@ -313,12 +385,11 @@
       window.AppShell.initHeader("lobby", user);
       bindEvents();
       await refreshLobbyData();
-
-      refreshTimer = window.setInterval(() => {
-        refreshLobbyData().catch((error) => {
-          console.error(error);
-        });
-      }, 15000);
+      stopPolling = window.AppShell.startAdaptivePolling(refreshLobbyData, {
+        activeMs: 15000,
+        hiddenMs: 60000,
+        runImmediately: false,
+      });
     } catch (error) {
       console.error(error);
       if (tablesState) {
@@ -333,8 +404,8 @@
   bootstrap();
 
   window.addEventListener("beforeunload", () => {
-    if (refreshTimer !== null) {
-      window.clearInterval(refreshTimer);
+    if (stopPolling) {
+      stopPolling();
     }
   });
 })();

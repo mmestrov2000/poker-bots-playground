@@ -5,6 +5,8 @@
   const myBotsState = document.getElementById("my-bots-state");
   const myBotsList = document.getElementById("my-bots-list");
 
+  let botsSignature = "";
+
   function formatTimestamp(value) {
     if (!value) {
       return "-";
@@ -43,8 +45,15 @@
     myBotsState.classList.add(`is-${type}`);
   }
 
+  function buildBotsSignature(bots) {
+    return bots
+      .map((bot) => [bot.bot_id, bot.name, bot.version, bot.status, bot.created_at, bot.uploaded_at].join("|"))
+      .join("||");
+  }
+
   function createMetadataRow(label, value) {
     const row = document.createElement("p");
+    row.className = "my-bot-meta-row";
     const labelElement = document.createElement("strong");
     labelElement.textContent = `${label}: `;
     const valueElement = document.createElement("span");
@@ -54,6 +63,13 @@
   }
 
   function renderMyBotsList(bots) {
+    const nextSignature = buildBotsSignature(bots);
+    if (nextSignature === botsSignature) {
+      myBotsState.classList.toggle("hidden", Boolean(bots.length));
+      myBotsList.classList.toggle("hidden", !bots.length);
+      return;
+    }
+    botsSignature = nextSignature;
     myBotsList.innerHTML = "";
 
     if (!bots.length) {
@@ -64,11 +80,19 @@
     bots.forEach((bot) => {
       const item = document.createElement("li");
       item.className = "my-bot-card";
-      const title = document.createElement("h4");
+      item.dataset.testid = `bot-card-${bot.bot_id}`;
+
+      const header = document.createElement("div");
+      header.className = "my-bot-card-header";
+      const title = document.createElement("h3");
       title.textContent = bot.name || "Unnamed Bot";
+      const badge = document.createElement("span");
+      badge.className = "bot-status-pill";
+      badge.textContent = bot.status || "ready";
+      header.append(title, badge);
 
       item.append(
-        title,
+        header,
         createMetadataRow("Bot ID", bot.bot_id || "-"),
         createMetadataRow("Version", bot.version || "-"),
         createMetadataRow("Status", bot.status || "-"),
@@ -94,6 +118,7 @@
     }
     myBotsUploadSubmit.disabled = isBusy;
     myBotsUploadSubmit.textContent = isBusy ? "Uploading..." : "Upload Bot";
+    myBotsUploadForm?.setAttribute("aria-busy", isBusy ? "true" : "false");
   }
 
   async function handleUploadSubmit(event) {
@@ -123,6 +148,7 @@
       });
       const uploadedName = response?.bot?.name || "bot";
       setUploadFeedback(`Upload successful: ${uploadedName}`, "success");
+      window.AppShell.notify(`Upload successful: ${uploadedName}`, "success");
       myBotsUploadForm.reset();
       await loadBots();
     } catch (error) {
@@ -131,6 +157,7 @@
         return;
       }
       setUploadFeedback(error.message || "Upload failed.", "error");
+      window.AppShell.notify(error.message || "Upload failed.", "error");
     } finally {
       setUploadBusy(false);
     }

@@ -7,11 +7,12 @@
     <link rel="stylesheet" href="/static/styles.css?v=__ASSET_VERSION__" />
   </head>
   <body data-page="table-detail">
-    <main id="app-shell" class="layout" aria-live="polite">
-      <header class="app-header">
+    <main id="app-shell" class="layout shell-page" aria-live="polite">
+      <header class="app-header surface-panel">
         <div class="app-brand">
-          <h1>Poker Bots Playground</h1>
-          <p>6-max No-Limit Texas Hold'em bot battle.</p>
+          <p class="panel-eyebrow">Poker Bots Playground</p>
+          <h1>Table Detail</h1>
+          <p>Seat bots, run matches, and review hand history without leaving the live arena.</p>
         </div>
         <nav class="app-nav" aria-label="Primary">
           <a id="nav-lobby" data-nav="lobby" href="/lobby">Lobby</a>
@@ -20,73 +21,140 @@
         </nav>
       </header>
 
-      <p id="auth-user" class="auth-user"></p>
-      <p class="auth-user">Table: <strong id="table-id-label">-</strong></p>
+      <section class="page-intro surface-panel page-intro-table">
+        <div>
+          <p class="panel-eyebrow">Live Arena</p>
+          <h2>Run a responsive 6-max table from one screen.</h2>
+          <p class="page-intro-copy">
+            Desktop keeps the felt-focused layout; smaller screens switch to readable stacked seat cards and compact control groups.
+          </p>
+        </div>
+        <div class="page-intro-metrics">
+          <p id="auth-user" class="auth-user metric-pill"></p>
+          <p class="metric-pill">Table <strong id="table-id-label">-</strong></p>
+          <p id="table-status-pill" class="metric-pill metric-pill-status" data-state="waiting">Waiting</p>
+          <p class="metric-pill">Hands <strong id="table-hands-count">0</strong></p>
+        </div>
+      </section>
 
-      <section class="arena">
-        <div class="arena-left">
-          <section class="table-area">
-            <div class="poker-table">
+      <section class="arena-layout">
+        <div class="arena-stage">
+          <section class="table-area surface-panel">
+            <div class="panel-header panel-header-tight">
+              <div>
+                <p class="panel-eyebrow">Arena</p>
+                <h2>Premium table view</h2>
+              </div>
+            </div>
+
+            <div class="poker-table" data-testid="poker-table">
               <div class="table-center">
-                <span>6-Max NLH Arena</span>
+                <p class="table-center-eyebrow">Premium Arena</p>
+                <h2 class="table-center-title">6-Max NLH Arena</h2>
+                <div class="table-center-meta">
+                  <span id="table-center-status">Waiting</span>
+                  <span id="table-center-hands">0 hands played</span>
+                </div>
               </div>
 
-              <article class="seat seat-1">
-                <h2>Seat 1</h2>
-                <p id="seat-1-name" class="seat-name">Open seat</p>
-                <button id="seat-1-take" class="seat-button">Take a seat</button>
+              <article class="seat seat-1" data-seat-id="1" data-state="empty">
+                <div class="seat-shell">
+                  <div class="seat-head">
+                    <h3>Seat 1</h3>
+                    <span id="seat-1-status" class="seat-status">Open</span>
+                  </div>
+                  <p id="seat-1-name" class="seat-name">Open seat</p>
+                  <button id="seat-1-take" class="seat-button" data-testid="seat-1-take">Seat Bot</button>
+                </div>
               </article>
 
-              <article class="seat seat-2">
-                <h2>Seat 2</h2>
-                <p id="seat-2-name" class="seat-name">Open seat</p>
-                <button id="seat-2-take" class="seat-button">Take a seat</button>
+              <article class="seat seat-2" data-seat-id="2" data-state="empty">
+                <div class="seat-shell">
+                  <div class="seat-head">
+                    <h3>Seat 2</h3>
+                    <span id="seat-2-status" class="seat-status">Open</span>
+                  </div>
+                  <p id="seat-2-name" class="seat-name">Open seat</p>
+                  <button id="seat-2-take" class="seat-button" data-testid="seat-2-take">Seat Bot</button>
+                </div>
               </article>
 
-              <article class="seat seat-3">
-                <h2>Seat 3</h2>
-                <p id="seat-3-name" class="seat-name">Open seat</p>
-                <button id="seat-3-take" class="seat-button">Take a seat</button>
+              <article class="seat seat-3" data-seat-id="3" data-state="empty">
+                <div class="seat-shell">
+                  <div class="seat-head">
+                    <h3>Seat 3</h3>
+                    <span id="seat-3-status" class="seat-status">Open</span>
+                  </div>
+                  <p id="seat-3-name" class="seat-name">Open seat</p>
+                  <button id="seat-3-take" class="seat-button" data-testid="seat-3-take">Seat Bot</button>
+                </div>
               </article>
 
-              <article class="seat seat-4">
-                <h2>Seat 4</h2>
-                <p id="seat-4-name" class="seat-name">Open seat</p>
-                <button id="seat-4-take" class="seat-button">Take a seat</button>
+              <article class="seat seat-4" data-seat-id="4" data-state="empty">
+                <div class="seat-shell">
+                  <div class="seat-head">
+                    <h3>Seat 4</h3>
+                    <span id="seat-4-status" class="seat-status">Open</span>
+                  </div>
+                  <p id="seat-4-name" class="seat-name">Open seat</p>
+                  <button id="seat-4-take" class="seat-button" data-testid="seat-4-take">Seat Bot</button>
+                </div>
               </article>
 
-              <article class="seat seat-5">
-                <h2>Seat 5</h2>
-                <p id="seat-5-name" class="seat-name">Open seat</p>
-                <button id="seat-5-take" class="seat-button">Take a seat</button>
+              <article class="seat seat-5" data-seat-id="5" data-state="empty">
+                <div class="seat-shell">
+                  <div class="seat-head">
+                    <h3>Seat 5</h3>
+                    <span id="seat-5-status" class="seat-status">Open</span>
+                  </div>
+                  <p id="seat-5-name" class="seat-name">Open seat</p>
+                  <button id="seat-5-take" class="seat-button" data-testid="seat-5-take">Seat Bot</button>
+                </div>
               </article>
 
-              <article class="seat seat-6">
-                <h2>Seat 6</h2>
-                <p id="seat-6-name" class="seat-name">Open seat</p>
-                <button id="seat-6-take" class="seat-button">Take a seat</button>
+              <article class="seat seat-6" data-seat-id="6" data-state="empty">
+                <div class="seat-shell">
+                  <div class="seat-head">
+                    <h3>Seat 6</h3>
+                    <span id="seat-6-status" class="seat-status">Open</span>
+                  </div>
+                  <p id="seat-6-name" class="seat-name">Open seat</p>
+                  <button id="seat-6-take" class="seat-button" data-testid="seat-6-take">Seat Bot</button>
+                </div>
               </article>
             </div>
           </section>
 
-          <section class="match-controls">
+          <section class="match-controls surface-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-eyebrow">Match Controls</p>
+                <h2>Control live play</h2>
+              </div>
+            </div>
             <div class="match-buttons">
-              <button id="start-match">Start</button>
+              <button id="start-match" data-testid="start-match">Start</button>
               <button id="pause-match" class="button-secondary">Pause</button>
               <button id="resume-match" class="button-secondary">Resume</button>
               <button id="end-match" class="button-danger">End</button>
               <button id="reset-match" class="button-ghost">Reset</button>
             </div>
-            <p id="match-status">Match: waiting</p>
+            <div class="match-status-card">
+              <p id="match-status">Match: waiting</p>
+              <p class="match-status-subtle">Polling slows down on hidden tabs to reduce churn without losing live context.</p>
+            </div>
           </section>
         </div>
 
-        <aside class="pnl-panel">
-          <div class="pnl-header">
-            <h2>Leaderboard</h2>
+        <aside class="pnl-panel surface-panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-eyebrow">Standings</p>
+              <h2>Leaderboard + P&amp;L</h2>
+            </div>
             <p class="pnl-subtitle">BB/hand</p>
           </div>
-          <ul id="leaderboard-list" class="leaderboard-list"></ul>
+          <ul id="leaderboard-list" class="leaderboard-list" data-testid="leaderboard-list"></ul>
           <div class="pnl-chart">
             <svg id="pnl-chart" viewBox="0 0 640 280" preserveAspectRatio="none" aria-label="P&L graph">
               <line id="pnl-zero-line" x1="0" y1="140" x2="640" y2="140" />
@@ -103,14 +171,17 @@
       </section>
 
       <section class="history-grid">
-        <section class="history-panel">
+        <section class="history-panel surface-panel">
           <div class="panel-header">
-            <h2>Hands Played</h2>
-            <button id="hand-history-button" type="button">Hand History</button>
+            <div>
+              <p class="panel-eyebrow">Timeline</p>
+              <h2>Hands Played</h2>
+            </div>
+            <button id="hand-history-button" type="button" data-testid="hand-history-button">Hand History</button>
           </div>
           <div id="hands-body" class="panel-body hands-body hidden">
             <div id="hands-controls" class="hands-controls hidden">
-              <label class="hands-page-size">
+              <label class="hands-page-size" for="hands-page-size">
                 Hands per page
                 <select id="hands-page-size">
                   <option value="100" selected>100</option>
@@ -124,29 +195,44 @@
                 <button id="hands-next" type="button" disabled>Next</button>
               </div>
             </div>
-            <ul id="hands-list" class="hands-list hidden"></ul>
+            <ul id="hands-list" class="hands-list hidden" data-testid="hands-list"></ul>
           </div>
         </section>
 
-        <section class="history-panel">
+        <section class="history-panel surface-panel">
           <div class="panel-header">
-            <h2>Hand Detail</h2>
+            <div>
+              <p class="panel-eyebrow">Detail</p>
+              <h2>Hand Detail</h2>
+            </div>
           </div>
           <div class="panel-body detail-body">
             <div class="detail-tabs">
               <button id="hand-detail-logs" type="button" class="button-ghost detail-tab active">Logs</button>
               <button id="hand-detail-replay" type="button" class="button-ghost detail-tab">Replay</button>
             </div>
-            <pre id="hand-detail" class="hand-detail">Select a hand to view full history.</pre>
+            <pre id="hand-detail" class="hand-detail" data-testid="hand-detail">Select a hand to view full history.</pre>
           </div>
         </section>
       </section>
     </main>
 
     <div id="seat-assignment-panel" class="seat-assignment-modal hidden" aria-hidden="true">
-      <section class="seat-assignment" role="dialog" aria-modal="true" aria-labelledby="seat-assignment-title" aria-live="polite">
+      <section
+        class="seat-assignment surface-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="seat-assignment-title"
+        aria-describedby="seat-assignment-subtitle"
+      >
         <div class="seat-assignment-header">
-          <h3 id="seat-assignment-title">Seat Assignment</h3>
+          <div>
+            <p class="panel-eyebrow">Seat Assignment</p>
+            <h3 id="seat-assignment-title">Seat Assignment</h3>
+            <p id="seat-assignment-subtitle" class="seat-assignment-subtitle">
+              Pick an existing bot or upload a new package without leaving the table.
+            </p>
+          </div>
           <button id="seat-assignment-close" type="button" class="button-ghost">Close</button>
         </div>
 
@@ -154,8 +240,10 @@
           <form id="seat-select-existing-form" class="seat-assignment-form">
             <h4>Choose Existing Bot</h4>
             <label class="field-label" for="seat-existing-bot-id">My Bots</label>
-            <select id="seat-existing-bot-id" name="bot_id"></select>
-            <button id="seat-select-existing-submit" type="submit">Seat Selected Bot</button>
+            <select id="seat-existing-bot-id" name="bot_id" data-testid="seat-existing-bot-id"></select>
+            <button id="seat-select-existing-submit" type="submit" data-testid="seat-select-existing-submit">
+              Seat Selected Bot
+            </button>
           </form>
 
           <form id="seat-create-new-form" class="seat-assignment-form">
@@ -170,7 +258,7 @@
           </form>
         </div>
 
-        <p id="seat-assignment-feedback" class="seat-assignment-feedback hidden"></p>
+        <p id="seat-assignment-feedback" class="seat-assignment-feedback hidden" role="status"></p>
       </section>
     </div>
 

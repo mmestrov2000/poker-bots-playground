@@ -39,6 +39,24 @@ source backend/.venv/bin/activate
 scripts/run_backend_pytest.sh
 ```
 
+## Frontend E2E Tests
+Install the Node test dependency and Chromium once per worktree:
+
+```bash
+npm install
+npm run install:e2e:browser
+```
+
+Run the responsive browser suite against the FastAPI app:
+
+```bash
+npm run test:e2e
+```
+
+Notes:
+- The Playwright config starts `uvicorn` automatically by sourcing `backend/.venv/bin/activate`.
+- E2E runs use `.playwright-runtime/` via `APP_RUNTIME_DIR` so local browser tests do not share your normal `runtime/` data.
+
 ## Local Run
 ### Option 1: Docker Compose
 ```bash

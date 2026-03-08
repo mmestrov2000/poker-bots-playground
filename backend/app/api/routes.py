@@ -1,4 +1,5 @@
 import math
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
@@ -21,9 +22,10 @@ from app.storage.hand_store import HandStore
 
 router = APIRouter()
 repo_root = Path(__file__).resolve().parents[3]
-uploads_dir = repo_root / "runtime" / "uploads"
+runtime_dir = Path(os.getenv("APP_RUNTIME_DIR", str(repo_root / "runtime")))
+uploads_dir = runtime_dir / "uploads"
 uploads_dir.mkdir(parents=True, exist_ok=True)
-hands_dir = repo_root / "runtime" / "hands"
+hands_dir = runtime_dir / "hands"
 hands_dir.mkdir(parents=True, exist_ok=True)
 
 auth_settings = AuthSettings.from_env(repo_root=repo_root)

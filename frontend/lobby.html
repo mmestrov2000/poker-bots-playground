@@ -7,11 +7,12 @@
     <link rel="stylesheet" href="/static/styles.css?v=__ASSET_VERSION__" />
   </head>
   <body data-page="lobby">
-    <main id="app-shell" class="layout" aria-live="polite">
-      <header class="app-header">
+    <main id="app-shell" class="layout shell-page" aria-live="polite">
+      <header class="app-header surface-panel">
         <div class="app-brand">
-          <h1>Poker Bots Playground</h1>
-          <p>Browse active tables, create a new table, and track global bot performance.</p>
+          <p class="panel-eyebrow">Poker Bots Playground</p>
+          <h1>Lobby</h1>
+          <p>Spin up new tables, scan the global leaderboard, and jump into live play from any device.</p>
         </div>
         <nav class="app-nav" aria-label="Primary">
           <a id="nav-lobby" data-nav="lobby" href="/lobby">Lobby</a>
@@ -20,43 +21,66 @@
         </nav>
       </header>
 
-      <p id="auth-user" class="auth-user"></p>
+      <section class="page-intro surface-panel">
+        <div>
+          <p class="panel-eyebrow">Control Center</p>
+          <h2>Create tables and monitor field performance.</h2>
+          <p class="page-intro-copy">
+            Responsive cards replace cramped mobile tables, while desktop keeps fast-scan metadata for frequent table switching.
+          </p>
+        </div>
+        <div class="page-intro-metrics">
+          <p id="auth-user" class="auth-user metric-pill"></p>
+          <p class="metric-pill">Live lobby refresh</p>
+          <p class="metric-pill">Global BB/hand ranking</p>
+        </div>
+      </section>
 
       <section class="lobby-grid">
-        <section class="lobby-panel" aria-labelledby="create-table-title">
+        <section class="lobby-panel surface-panel" aria-labelledby="create-table-title">
           <div class="panel-header">
-            <h2 id="create-table-title">Create Table</h2>
+            <div>
+              <p class="panel-eyebrow">New Arena</p>
+              <h2 id="create-table-title">Create Table</h2>
+            </div>
           </div>
-          <form id="create-table-form" class="create-table-form" novalidate>
+          <form id="create-table-form" class="create-table-form" novalidate data-testid="create-table-form">
             <label class="field-label" for="create-small-blind">Small Blind</label>
             <input id="create-small-blind" name="small_blind" type="number" min="0.01" step="0.01" value="0.5" required />
 
             <label class="field-label" for="create-big-blind">Big Blind</label>
             <input id="create-big-blind" name="big_blind" type="number" min="0.01" step="0.01" value="1" required />
 
-            <button id="create-table-submit" type="submit">Create Table</button>
+            <button id="create-table-submit" type="submit" data-testid="create-table-submit">Create Table</button>
           </form>
           <p id="create-table-feedback" class="lobby-feedback hidden" role="status"></p>
         </section>
 
-        <section class="lobby-panel" aria-labelledby="lobby-leaderboard-title">
+        <section class="lobby-panel surface-panel" aria-labelledby="lobby-leaderboard-title">
           <div class="panel-header">
-            <h2 id="lobby-leaderboard-title">Global Leaderboard</h2>
+            <div>
+              <p class="panel-eyebrow">All-Time Form</p>
+              <h2 id="lobby-leaderboard-title">Global Leaderboard</h2>
+            </div>
             <button id="refresh-leaderboard" type="button" class="button-secondary">Refresh</button>
           </div>
           <p id="lobby-leaderboard-state" class="lobby-state">Loading leaderboard...</p>
-          <ol id="lobby-leaderboard-list" class="lobby-leaderboard-list hidden"></ol>
+          <ol id="lobby-leaderboard-list" class="lobby-leaderboard-list hidden" data-testid="lobby-leaderboard-list"></ol>
         </section>
       </section>
 
-      <section class="lobby-panel" aria-labelledby="lobby-tables-title">
+      <section class="lobby-panel surface-panel" aria-labelledby="lobby-tables-title">
         <div class="panel-header">
-          <h2 id="lobby-tables-title">Tables</h2>
+          <div>
+            <p class="panel-eyebrow">Live Tables</p>
+            <h2 id="lobby-tables-title">Tables</h2>
+          </div>
           <button id="refresh-tables" type="button" class="button-secondary">Refresh</button>
         </div>
         <p id="lobby-tables-state" class="lobby-state">Loading tables...</p>
+        <div id="lobby-table-cards" class="lobby-table-cards hidden" data-testid="lobby-table-cards"></div>
         <div class="lobby-table-scroll">
-          <table id="lobby-tables-table" class="lobby-tables-table hidden">
+          <table id="lobby-tables-table" class="lobby-tables-table hidden" data-testid="lobby-tables-table">
             <thead>
               <tr>
                 <th>Table</th>

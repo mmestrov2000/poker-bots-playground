@@ -6,38 +6,73 @@
     <title>Login | Poker Bots Playground</title>
     <link rel="stylesheet" href="/static/styles.css?v=__ASSET_VERSION__" />
   </head>
-  <body>
+  <body class="auth-screen">
     <main id="login-page" class="auth-layout" aria-live="polite">
-      <section class="auth-card">
-        <h1>Poker Bots Playground</h1>
-        <p id="auth-subtitle" class="auth-subtitle">Sign in to access Lobby and My Bots.</p>
-        <div class="auth-mode-switch" role="group" aria-label="Authentication mode">
-          <button id="auth-mode-login" type="button" class="auth-mode-button active">Login</button>
-          <button id="auth-mode-register" type="button" class="auth-mode-button">Register</button>
-        </div>
-        <form id="auth-form" novalidate>
-          <label class="field-label" for="auth-username">Username</label>
-          <input id="auth-username" name="username" type="text" autocomplete="username" maxlength="64" required />
-          <p id="auth-username-error" class="field-error hidden"></p>
+      <section class="auth-grid">
+        <article class="auth-hero surface-panel" data-testid="auth-hero">
+          <p class="panel-eyebrow">Premium Poker Arena</p>
+          <h1>Run bot battles in a live, responsive poker lounge.</h1>
+          <p class="auth-subtitle">
+            Upload bots, manage multiple tables, track long-run results, and inspect every hand without losing the table view.
+          </p>
+          <div class="auth-metrics">
+            <div class="metric-card">
+              <span class="metric-value">6</span>
+              <span class="metric-label">Max seats per table</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-value">Live</span>
+              <span class="metric-label">Polling match updates</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-value">History</span>
+              <span class="metric-label">Replay every hand</span>
+            </div>
+          </div>
+        </article>
 
-          <label class="field-label" for="auth-password">Password</label>
-          <input
-            id="auth-password"
-            name="password"
-            type="password"
-            autocomplete="current-password"
-            maxlength="1024"
-            required
-          />
-          <p id="auth-password-error" class="field-error hidden"></p>
+        <section class="auth-card surface-panel" data-testid="auth-card">
+          <div class="auth-card-header">
+            <p class="panel-eyebrow">Account Access</p>
+            <h2>Enter the arena</h2>
+            <p id="auth-subtitle" class="auth-subtitle">Sign in to access Lobby and My Bots.</p>
+          </div>
 
-          <p id="auth-form-success" class="form-success hidden"></p>
-          <p id="auth-form-error" class="form-error hidden"></p>
-          <button id="auth-submit" type="submit">Login</button>
-        </form>
+          <div class="auth-mode-switch" role="group" aria-label="Authentication mode">
+            <button id="auth-mode-login" type="button" class="auth-mode-button active" data-testid="auth-mode-login">
+              Login
+            </button>
+            <button id="auth-mode-register" type="button" class="auth-mode-button" data-testid="auth-mode-register">
+              Register
+            </button>
+          </div>
+
+          <form id="auth-form" class="auth-form" novalidate data-testid="auth-form">
+            <label class="field-label" for="auth-username">Username</label>
+            <input id="auth-username" name="username" type="text" autocomplete="username" maxlength="64" required />
+            <p id="auth-username-error" class="field-error hidden"></p>
+
+            <label class="field-label" for="auth-password">Password</label>
+            <input
+              id="auth-password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              maxlength="1024"
+              required
+            />
+            <p id="auth-password-error" class="field-error hidden"></p>
+
+            <p id="auth-form-success" class="form-success hidden"></p>
+            <p id="auth-form-error" class="form-error hidden"></p>
+
+            <button id="auth-submit" type="submit" data-testid="auth-submit">Login</button>
+          </form>
+        </section>
       </section>
     </main>
 
+    <script src="/static/app-shell.js?v=__ASSET_VERSION__" defer></script>
     <script src="/static/login.js?v=__ASSET_VERSION__" defer></script>
   </body>
 </html>

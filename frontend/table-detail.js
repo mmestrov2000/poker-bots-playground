@@ -1,5 +1,6 @@
 (() => {
   const handDetailPlaceholder = "Select a hand to view full history.";
+  const replayPlaceholder = "Replay view is not available yet.";
   const seatIds = ["1", "2", "3", "4", "5", "6"];
 
   let selectedHandId = null;
@@ -15,12 +16,22 @@
   let pnlLastHandId = null;
   let pnlPoints = {};
   let pnlRefreshing = false;
+  let pnlRenderSignature = "";
+  let pnlRenderQueued = false;
   let seatNames = {};
   let pnlVisibility = {};
-  let refreshTimer = null;
   let activeSeatId = null;
   let myBotsCache = [];
   let seatAssignmentBusy = false;
+  let stateRefreshInFlight = false;
+  let refreshErrorNotified = false;
+  let currentSeatSignature = "";
+  let currentMatchSignature = "";
+  let currentLeaderboardSignature = "";
+  let currentHandsSignature = "";
+  let currentBotsSignature = "";
+  let lastSeatTrigger = null;
+  let stopPolling = null;
 
   const tableId = (() => {
     const match = window.location.pathname.match(/^\/tables\/([^/]+)$/);
@@ -41,6 +52,43 @@
     return `/tables/${encodeURIComponent(tableId)}${path}`;
   }
 
+  function serializeSeats(seats) {
+    return seats
+      .map((seat) => [seat.seat_id, seat.bot_name || "", Boolean(seat.ready), seat.bot_id || ""].join("|"))
+      .join("||");
+  }
+
+  function serializeLeaderboard(leaders) {
+    return leaders
+      .map((leader) => [leader.seat_id, leader.bot_name || "", leader.bb_per_hand, leader.hands_played].join("|"))
+      .join("||");
+  }
+
+  function serializeMatch(match) {
+    return [match.status, match.hands_played].join("|");
+  }
+
+  function serializeHands(response) {
+    return [
+      response.page,
+      response.page_size,
+      response.total_hands,
+      response.total_pages,
+      ...(response.hands || []).map((hand) => [hand.hand_id, hand.summary].join("|")),
+    ].join("||");
+  }
+
+  function serializeBots(bots) {
+    return bots.map((bot) => [bot.bot_id, bot.name, bot.version].join("|")).join("||");
+  }
+
+  function formatStatus(status) {
+    if (!status) {
+      return "Waiting";
+    }
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  }
+
   const handDetailTabs = {
     logs: document.getElementById("hand-detail-logs"),
     replay: document.getElementById("hand-detail-replay"),
@@ -54,6 +102,7 @@
       seatIds.map((seatId) => [seatId, document.getElementById(`pnl-line-${seatId}`)])
     ),
   };
+
   const leaderboardList = document.getElementById("leaderboard-list");
   const seatAssignmentPanel = document.getElementById("seat-assignment-panel");
   const seatAssignmentTitle = document.getElementById("seat-assignment-title");
@@ -66,15 +115,43 @@
 
   function updateTableLabel() {
     const tableIdLabel = document.getElementById("table-id-label");
-    if (!tableIdLabel) {
-      return;
+    if (tableIdLabel) {
+      tableIdLabel.textContent = tableId || "unknown";
     }
-    tableIdLabel.textContent = tableId || "unknown";
+  }
+
+  function updateTableStatusBadges(match) {
+    const handsPlayed = Number(match.hands_played || 0);
+    const statusLabel = formatStatus(match.status);
+    const statusPill = document.getElementById("table-status-pill");
+    const handsCount = document.getElementById("table-hands-count");
+    const centerStatus = document.getElementById("table-center-status");
+    const centerHands = document.getElementById("table-center-hands");
+
+    if (statusPill) {
+      statusPill.textContent = statusLabel;
+      statusPill.dataset.state = match.status || "waiting";
+    }
+    if (handsCount) {
+      handsCount.textContent = String(handsPlayed);
+    }
+    if (centerStatus) {
+      centerStatus.textContent = statusLabel;
+    }
+    if (centerHands) {
+      centerHands.textContent = `${handsPlayed} hands played`;
+    }
   }
 
   function updateSeatStatus(seats) {
+    const signature = serializeSeats(seats);
     const byId = Object.fromEntries(seats.map((seat) => [seat.seat_id, seat]));
     let readyCount = 0;
+
+    if (signature === currentSeatSignature) {
+      return seats.filter((seat) => seat.ready).length >= 2;
+    }
+    currentSeatSignature = signature;
 
     seatIds.forEach((seatId) => {
       const seat = byId[seatId];
@@ -87,9 +164,20 @@
         nameEl.textContent = name;
       }
 
+      const statusEl = document.getElementById(`seat-${seatId}-status`);
+      if (statusEl) {
+        statusEl.textContent = seatReady ? "Ready" : "Open";
+      }
+
       const seatButton = document.getElementById(`seat-${seatId}-take`);
       if (seatButton) {
-        seatButton.disabled = seatReady;
+        seatButton.disabled = seatReady || seatAssignmentBusy;
+        seatButton.textContent = seatReady ? "Seated" : "Seat Bot";
+      }
+
+      const seatCard = document.querySelector(`.seat[data-seat-id="${seatId}"]`);
+      if (seatCard) {
+        seatCard.setAttribute("data-state", seatReady ? "ready" : "empty");
       }
 
       if (seatReady) {
@@ -105,7 +193,7 @@
     if (!detail) {
       return;
     }
-    detail.textContent = handDetailMode === "logs" ? handDetailText : "";
+    detail.textContent = handDetailMode === "logs" ? handDetailText : replayPlaceholder;
   }
 
   function setHandDetailMode(mode) {
@@ -113,6 +201,34 @@
     handDetailTabs.logs?.classList.toggle("active", mode === "logs");
     handDetailTabs.replay?.classList.toggle("active", mode === "replay");
     renderHandDetail();
+  }
+
+  function buildPnlRenderSignature() {
+    const visibilitySignature = seatIds.map((seatId) => `${seatId}:${Boolean(pnlVisibility[seatId])}`).join("|");
+    const dataSignature = seatIds
+      .map((seatId) => {
+        const points = pnlPoints[seatId] || [];
+        const lastPoint = points.length ? points[points.length - 1] : null;
+        return `${seatId}:${points.length}:${lastPoint?.handId ?? "-"}:${lastPoint?.value ?? "-"}`;
+      })
+      .join("|");
+    return `${pnlLastHandId ?? "none"}|${visibilitySignature}|${dataSignature}`;
+  }
+
+  function queuePnlRender(force = false) {
+    const nextSignature = buildPnlRenderSignature();
+    if (!force && nextSignature === pnlRenderSignature) {
+      return;
+    }
+    pnlRenderSignature = nextSignature;
+    if (pnlRenderQueued) {
+      return;
+    }
+    pnlRenderQueued = true;
+    window.requestAnimationFrame(() => {
+      pnlRenderQueued = false;
+      renderPnlChart();
+    });
   }
 
   function renderPnlChart() {
@@ -204,10 +320,11 @@
   function resetPnlState() {
     pnlLastHandId = null;
     pnlPoints = Object.fromEntries(seatIds.map((seatId) => [seatId, []]));
-    renderPnlChart();
+    queuePnlRender(true);
   }
 
   function applyPnlEntries(entries) {
+    let hasChanges = false;
     entries.forEach((entry) => {
       const handId = Number(entry.hand_id);
       if (!Number.isFinite(handId)) {
@@ -224,15 +341,23 @@
         pnlPoints[seatId].push({ handId, value: lastValue + delta });
       });
       pnlLastHandId = handId;
+      hasChanges = true;
     });
+    return hasChanges;
   }
 
   function updateLeaderboard(leaderboard) {
     if (!leaderboardList) {
       return;
     }
-    leaderboardList.innerHTML = "";
     const leaders = leaderboard?.leaders ?? [];
+    const signature = serializeLeaderboard(leaders);
+    if (signature === currentLeaderboardSignature) {
+      return;
+    }
+    currentLeaderboardSignature = signature;
+    leaderboardList.innerHTML = "";
+
     if (!leaders.length) {
       const item = document.createElement("li");
       item.className = "leaderboard-empty";
@@ -248,19 +373,25 @@
       }
       const item = document.createElement("li");
       item.className = "leaderboard-item";
+      item.dataset.testid = `table-leader-seat-${seatId}`;
 
       const label = document.createElement("label");
+      label.className = "leaderboard-toggle";
+
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.checked = Boolean(pnlVisibility[seatId]);
       checkbox.addEventListener("change", () => {
         pnlVisibility[seatId] = checkbox.checked;
-        renderPnlChart();
+        queuePnlRender(true);
       });
+
       const dot = document.createElement("span");
       dot.className = `leaderboard-dot leaderboard-dot-${seatId}`;
+
       const name = document.createElement("span");
       name.textContent = `Seat ${seatId}${leader.bot_name ? ` (${leader.bot_name})` : ""}`;
+
       label.append(checkbox, dot, name);
 
       const stat = document.createElement("span");
@@ -286,11 +417,13 @@
       const query = params.toString();
       const response = await window.AppShell.request(`${tableApiPath("/pnl")}${query ? `?${query}` : ""}`);
       const entries = response.entries ?? [];
-      applyPnlEntries(entries);
+      const pnlChanged = applyPnlEntries(entries);
       if (response.last_hand_id !== null && response.last_hand_id !== undefined) {
         pnlLastHandId = response.last_hand_id;
       }
-      renderPnlChart();
+      if (pnlChanged || entries.length) {
+        queuePnlRender();
+      }
     } catch (error) {
       if (error.statusCode === 401) {
         window.location.assign("/login");
@@ -303,11 +436,17 @@
   }
 
   function updateMatchStatus(match) {
+    const signature = serializeMatch(match);
     latestMatch = match;
+    if (signature === currentMatchSignature) {
+      return;
+    }
+    currentMatchSignature = signature;
     const statusElement = document.getElementById("match-status");
     if (statusElement) {
       statusElement.textContent = `Match: ${match.status}, hands played: ${match.hands_played}`;
     }
+    updateTableStatusBadges(match);
   }
 
   function updateMatchControls(match, seatsReady) {
@@ -315,8 +454,9 @@
     const pauseButton = document.getElementById("pause-match");
     const resumeButton = document.getElementById("resume-match");
     const endButton = document.getElementById("end-match");
+    const resetButton = document.getElementById("reset-match");
 
-    if (!startButton || !pauseButton || !resumeButton || !endButton) {
+    if (!startButton || !pauseButton || !resumeButton || !endButton || !resetButton) {
       return;
     }
 
@@ -324,6 +464,7 @@
     pauseButton.disabled = match.status !== "running";
     resumeButton.disabled = match.status !== "paused";
     endButton.disabled = !(match.status === "running" || match.status === "paused");
+    resetButton.disabled = false;
   }
 
   function setSeatAssignmentFeedback(message, type = "error") {
@@ -344,11 +485,22 @@
     seatAssignmentFeedback.classList.remove("is-success", "is-error");
   }
 
+  function getSeatAssignmentFocusables() {
+    if (!seatAssignmentPanel) {
+      return [];
+    }
+    return [...seatAssignmentPanel.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])")]
+      .filter((element) => !element.hasAttribute("disabled") && !element.getAttribute("aria-hidden"));
+  }
+
   function closeSeatAssignmentPanel() {
     activeSeatId = null;
     clearSeatAssignmentFeedback();
     seatAssignmentPanel?.classList.add("hidden");
     seatAssignmentPanel?.setAttribute("aria-hidden", "true");
+    if (lastSeatTrigger instanceof HTMLElement) {
+      lastSeatTrigger.focus();
+    }
   }
 
   function renderOwnedBotOptions() {
@@ -381,8 +533,13 @@
 
   async function loadMyBotsForSeatPanel() {
     const response = await window.AppShell.request("/my/bots");
-    myBotsCache = response.bots || [];
-    renderOwnedBotOptions();
+    const bots = response.bots || [];
+    const signature = serializeBots(bots);
+    myBotsCache = bots;
+    if (signature !== currentBotsSignature) {
+      currentBotsSignature = signature;
+      renderOwnedBotOptions();
+    }
   }
 
   async function seatExistingBot(botId) {
@@ -428,7 +585,7 @@
     clearHandDetail();
     clearHandHistory();
     await refreshState();
-    setSeatAssignmentFeedback(successMessage, "success");
+    window.AppShell.notify(successMessage, "success");
     closeSeatAssignmentPanel();
   }
 
@@ -440,10 +597,21 @@
     if (seatCreateNewSubmit) {
       seatCreateNewSubmit.disabled = isBusy;
     }
+    seatIds.forEach((seatId) => {
+      const seatButton = document.getElementById(`seat-${seatId}-take`);
+      if (!seatButton) {
+        return;
+      }
+      const seatCard = document.querySelector(`.seat[data-seat-id="${seatId}"]`);
+      const seatReady = seatCard?.getAttribute("data-state") === "ready";
+      seatButton.disabled = isBusy || seatReady;
+      seatButton.textContent = seatReady ? "Seated" : "Seat Bot";
+    });
   }
 
-  async function openSeatAssignmentPanel(seatId) {
+  async function openSeatAssignmentPanel(seatId, triggerElement) {
     activeSeatId = seatId;
+    lastSeatTrigger = triggerElement || null;
     clearSeatAssignmentFeedback();
     if (seatAssignmentTitle) {
       seatAssignmentTitle.textContent = `Seat ${seatId} Assignment`;
@@ -470,6 +638,7 @@
 
     hands.forEach((hand) => {
       const item = document.createElement("li");
+      item.dataset.testid = `hand-row-${hand.hand_id}`;
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = hand.summary;
@@ -522,7 +691,11 @@
     const response = await window.AppShell.request(`${tableApiPath("/hands")}?${params.toString()}`);
     handsTotalHands = response.total_hands ?? 0;
     handsTotalPages = response.total_pages ?? (handsTotalHands ? Math.ceil(handsTotalHands / handsPageSize) : 0);
-    renderHands(response.hands);
+    const signature = serializeHands(response);
+    if (signature !== currentHandsSignature) {
+      currentHandsSignature = signature;
+      renderHands(response.hands || []);
+    }
     updateHandsPagination();
   }
 
@@ -541,7 +714,7 @@
     const hand = await window.AppShell.request(tableApiPath(`/hands/${encodeURIComponent(handId)}`));
     selectedHandId = handId;
     handDetailText = hand.history || "No hand history available.";
-    renderHandDetail();
+    setHandDetailMode("logs");
   }
 
   function clearHandDetail() {
@@ -556,6 +729,7 @@
     handsPage = 1;
     handsTotalHands = 0;
     handsTotalPages = 0;
+    currentHandsSignature = "";
     const list = document.getElementById("hands-list");
     if (list) {
       list.innerHTML = "";
@@ -565,6 +739,10 @@
   }
 
   async function refreshState() {
+    if (stateRefreshInFlight) {
+      return;
+    }
+    stateRefreshInFlight = true;
     try {
       const [seats, match, leaderboard] = await Promise.all([
         window.AppShell.request(tableApiPath("/seats")),
@@ -576,37 +754,49 @@
       updateMatchStatus(match.match);
       updateMatchControls(match.match, seatsReady);
       updateLeaderboard(leaderboard);
-      const hasPnlPoints = seatIds.some((seatId) => pnlPoints[seatId]?.length);
-      if (match.match.hands_played === 0 && hasPnlPoints) {
+
+      const matchHands = Number(match.match.hands_played || 0);
+      if ((pnlLastHandId !== null && matchHands < pnlLastHandId) || matchHands === 0) {
         resetPnlState();
       }
       await refreshPnl();
+      refreshErrorNotified = false;
     } catch (error) {
       if (error.statusCode === 401) {
         window.location.assign("/login");
         return;
       }
       console.error(error);
+      if (!refreshErrorNotified) {
+        window.AppShell.notify("Live table refresh failed. Retrying in the background.", "warning");
+        refreshErrorNotified = true;
+      }
+    } finally {
+      stateRefreshInFlight = false;
     }
   }
 
   async function startMatch() {
     await window.AppShell.request(tableApiPath("/match/start"), { method: "POST" });
+    window.AppShell.notify("Match started.", "success");
     await refreshState();
   }
 
   async function pauseMatch() {
     await window.AppShell.request(tableApiPath("/match/pause"), { method: "POST" });
+    window.AppShell.notify("Match paused.", "info");
     await refreshState();
   }
 
   async function resumeMatch() {
     await window.AppShell.request(tableApiPath("/match/resume"), { method: "POST" });
+    window.AppShell.notify("Match resumed.", "success");
     await refreshState();
   }
 
   async function endMatch() {
     await window.AppShell.request(tableApiPath("/match/end"), { method: "POST" });
+    window.AppShell.notify("Match ended.", "warning");
     await refreshState();
   }
 
@@ -615,7 +805,45 @@
     clearHandDetail();
     clearHandHistory();
     resetPnlState();
+    window.AppShell.notify("Match reset.", "info");
     await refreshState();
+  }
+
+  function handleActionError(error, fallbackMessage) {
+    console.error(error);
+    if (error.statusCode === 401) {
+      window.location.assign("/login");
+      return;
+    }
+    window.AppShell.notify(error.message || fallbackMessage, "error");
+  }
+
+  function handleModalKeydown(event) {
+    if (seatAssignmentPanel?.classList.contains("hidden")) {
+      return;
+    }
+    if (event.key === "Escape") {
+      closeSeatAssignmentPanel();
+      return;
+    }
+    if (event.key !== "Tab") {
+      return;
+    }
+    const focusable = getSeatAssignmentFocusables();
+    if (!focusable.length) {
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   function wireEvents() {
@@ -625,7 +853,7 @@
         return;
       }
       seatButton.addEventListener("click", () =>
-        openSeatAssignmentPanel(seatId).catch((error) => alert(error.message))
+        openSeatAssignmentPanel(seatId, seatButton).catch((error) => handleActionError(error, "Failed to open seat assignment."))
       );
     });
 
@@ -635,11 +863,8 @@
         closeSeatAssignmentPanel();
       }
     });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && !seatAssignmentPanel?.classList.contains("hidden")) {
-        closeSeatAssignmentPanel();
-      }
-    });
+    document.addEventListener("keydown", handleModalKeydown);
+
     seatSelectExistingForm?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (seatAssignmentBusy) {
@@ -662,6 +887,7 @@
         })
         .finally(() => setSeatAssignmentBusy(false));
     });
+
     seatCreateNewForm?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (seatAssignmentBusy) {
@@ -680,34 +906,36 @@
         .finally(() => setSeatAssignmentBusy(false));
     });
 
-    document.getElementById("start-match")?.addEventListener("click", () => startMatch().catch((error) => alert(error.message)));
-    document.getElementById("pause-match")?.addEventListener("click", () => pauseMatch().catch((error) => alert(error.message)));
-    document.getElementById("resume-match")?.addEventListener("click", () => resumeMatch().catch((error) => alert(error.message)));
-    document.getElementById("end-match")?.addEventListener("click", () => endMatch().catch((error) => alert(error.message)));
-    document.getElementById("reset-match")?.addEventListener("click", () => resetMatch().catch((error) => alert(error.message)));
+    document.getElementById("start-match")?.addEventListener("click", () => startMatch().catch((error) => handleActionError(error, "Failed to start match.")));
+    document.getElementById("pause-match")?.addEventListener("click", () => pauseMatch().catch((error) => handleActionError(error, "Failed to pause match.")));
+    document.getElementById("resume-match")?.addEventListener("click", () => resumeMatch().catch((error) => handleActionError(error, "Failed to resume match.")));
+    document.getElementById("end-match")?.addEventListener("click", () => endMatch().catch((error) => handleActionError(error, "Failed to end match.")));
+    document.getElementById("reset-match")?.addEventListener("click", () => resetMatch().catch((error) => handleActionError(error, "Failed to reset match.")));
     document
       .getElementById("hand-history-button")
-      ?.addEventListener("click", () => showHandHistory().catch((error) => alert(error.message)));
+      ?.addEventListener("click", () => showHandHistory().catch((error) => handleActionError(error, "Failed to load hand history.")));
 
     document.getElementById("hands-page-size")?.addEventListener("change", (event) => {
       handsPageSize = Number(event.target.value);
       handsPage = 1;
       if (handHistoryVisible) {
-        loadHandHistoryPage().catch((error) => alert(error.message));
+        loadHandHistoryPage().catch((error) => handleActionError(error, "Failed to load hand history."));
       } else {
         updateHandsPagination();
       }
     });
+
     document.getElementById("hands-prev")?.addEventListener("click", () => {
       if (handsPage > 1) {
         handsPage -= 1;
-        loadHandHistoryPage().catch((error) => alert(error.message));
+        loadHandHistoryPage().catch((error) => handleActionError(error, "Failed to load hand history."));
       }
     });
+
     document.getElementById("hands-next")?.addEventListener("click", () => {
       if (handsPage < handsTotalPages) {
         handsPage += 1;
-        loadHandHistoryPage().catch((error) => alert(error.message));
+        loadHandHistoryPage().catch((error) => handleActionError(error, "Failed to load hand history."));
       }
     });
 
@@ -731,10 +959,11 @@
     wireEvents();
     await refreshState();
 
-    if (refreshTimer !== null) {
-      window.clearInterval(refreshTimer);
-    }
-    refreshTimer = window.setInterval(refreshState, 2000);
+    stopPolling = window.AppShell.startAdaptivePolling(refreshState, {
+      activeMs: 2000,
+      hiddenMs: 12000,
+      runImmediately: false,
+    });
   }
 
   bootstrap().catch((error) => {
@@ -743,8 +972,8 @@
   });
 
   window.addEventListener("beforeunload", () => {
-    if (refreshTimer !== null) {
-      window.clearInterval(refreshTimer);
+    if (stopPolling) {
+      stopPolling();
     }
   });
 })();

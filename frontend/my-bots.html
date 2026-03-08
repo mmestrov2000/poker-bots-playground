@@ -7,11 +7,12 @@
     <link rel="stylesheet" href="/static/styles.css?v=__ASSET_VERSION__" />
   </head>
   <body data-page="my-bots">
-    <main id="app-shell" class="layout" aria-live="polite">
-      <header class="app-header">
+    <main id="app-shell" class="layout shell-page" aria-live="polite">
+      <header class="app-header surface-panel">
         <div class="app-brand">
-          <h1>Poker Bots Playground</h1>
-          <p>6-max No-Limit Texas Hold'em bot battle.</p>
+          <p class="panel-eyebrow">Poker Bots Playground</p>
+          <h1>My Bots</h1>
+          <p>Manage your private bot roster and keep new uploads ready for fast seating at any table.</p>
         </div>
         <nav class="app-nav" aria-label="Primary">
           <a id="nav-lobby" data-nav="lobby" href="/lobby">Lobby</a>
@@ -20,17 +21,30 @@
         </nav>
       </header>
 
-      <p id="auth-user" class="auth-user"></p>
+      <section class="page-intro surface-panel">
+        <div>
+          <p class="panel-eyebrow">Bot Catalog</p>
+          <h2>Upload once, seat anywhere.</h2>
+          <p class="page-intro-copy">
+            The upload flow keeps metadata readable, states explicit, and the catalog easy to scan across desktop and mobile.
+          </p>
+        </div>
+        <div class="page-intro-metrics">
+          <p id="auth-user" class="auth-user metric-pill"></p>
+          <p class="metric-pill">Private bot storage</p>
+          <p class="metric-pill">Seat from catalog</p>
+        </div>
+      </section>
 
-      <section class="my-bots-page">
-        <header class="my-bots-header">
-          <h2>My Bots</h2>
-          <p>Manage your uploaded bots for table seating.</p>
-        </header>
-
-        <section class="my-bots-upload" aria-labelledby="my-bots-upload-title">
-          <h3 id="my-bots-upload-title">Upload New Bot</h3>
-          <form id="my-bots-upload-form" class="my-bots-upload-form">
+      <section class="my-bots-grid">
+        <section class="my-bots-panel surface-panel" aria-labelledby="my-bots-upload-title">
+          <div class="panel-header">
+            <div>
+              <p class="panel-eyebrow">Upload</p>
+              <h2 id="my-bots-upload-title">Add New Bot</h2>
+            </div>
+          </div>
+          <form id="my-bots-upload-form" class="my-bots-upload-form" data-testid="my-bots-upload-form">
             <label class="field-label" for="bot-name">Bot Name</label>
             <input id="bot-name" name="name" type="text" maxlength="120" required />
 
@@ -40,15 +54,20 @@
             <label class="field-label" for="bot-file">Bot Package (.zip)</label>
             <input id="bot-file" name="bot_file" type="file" accept=".zip" required />
 
-            <button id="my-bots-upload-submit" type="submit">Upload Bot</button>
+            <button id="my-bots-upload-submit" type="submit" data-testid="my-bots-upload-submit">Upload Bot</button>
           </form>
           <p id="my-bots-upload-feedback" class="my-bots-upload-feedback hidden" role="status"></p>
         </section>
 
-        <section class="my-bots-catalog" aria-labelledby="my-bots-catalog-title">
-          <h3 id="my-bots-catalog-title">Catalog</h3>
+        <section class="my-bots-panel surface-panel" aria-labelledby="my-bots-catalog-title">
+          <div class="panel-header">
+            <div>
+              <p class="panel-eyebrow">Catalog</p>
+              <h2 id="my-bots-catalog-title">Ready Bots</h2>
+            </div>
+          </div>
           <p id="my-bots-state" class="my-bots-state" role="status">Loading bots...</p>
-          <ul id="my-bots-list" class="my-bots-list hidden"></ul>
+          <ul id="my-bots-list" class="my-bots-list hidden" data-testid="my-bots-list"></ul>
         </section>
       </section>
     </main>

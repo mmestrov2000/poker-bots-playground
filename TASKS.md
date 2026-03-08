@@ -333,3 +333,28 @@ Goal: ensure each lobby table opens and stays on its own isolated runtime state 
   - Add regression coverage for multi-table isolation and table-detail frontend endpoint wiring. Done in `backend/tests/test_api_endpoints.py` and `backend/tests/test_frontend_auth_shell.py`.
   - Acceptance: Opening a selected table consistently shows that table's own seats, match state, hands, P&L, and leaderboard.
   - Test Strategy: Backend `pytest` suite with multi-table API isolation checks and frontend smoke assertions.
+
+## Feature: Frontend Responsive UX Refresh
+Goal: upgrade the full static frontend into a premium poker-arena experience with responsive layouts, non-blocking feedback, and stronger browser-level validation.
+
+- [x] `FUI-T1` Establish a shared responsive design system and shell foundation (owner: `feature-agent`)
+  - Acceptance: one tokenized visual system for typography, spacing, surfaces, buttons, forms, focus states, and header layout works at `360px`, `768px`, and `1440px`.
+  - Test Strategy: HTML/JS smoke assertions plus manual browser verification at target breakpoints.
+- [x] `FUI-T2` Redesign Table Detail as the primary premium arena experience (owner: `feature-agent`)
+  - Acceptance: desktop keeps a strong table-centered layout; mobile switches to readable stacked seat cards and controls instead of shrinking absolute seat overlays; seating, match controls, P&L, hand history, and detail remain usable at all target widths.
+  - Test Strategy: Frontend smoke coverage plus Playwright live table flow.
+- [x] `FUI-T3` Redesign Lobby for fast scanning and mobile-friendly table management (owner: `feature-agent`)
+  - Acceptance: create-table, leaderboard, and table list share the new visual system; mobile renders card-style table summaries while desktop keeps the richer table grid; create/open/refresh states stay clear and non-blocking.
+  - Test Strategy: Frontend smoke coverage plus Playwright lobby responsive checks.
+- [x] `FUI-T4` Refresh Login and My Bots to match the new system (owner: `feature-agent`)
+  - Acceptance: auth and upload flows get stronger hierarchy, clearer validation/empty/error states, and small-screen usability without changing backend flows.
+  - Test Strategy: Frontend smoke coverage plus Playwright auth/upload flow.
+- [x] `FUI-T5` Add shared motion, feedback, and accessibility behavior (owner: `feature-agent`)
+  - Acceptance: blocking `alert()` flows are replaced with shared toast or inline feedback; page-enter, modal, seat-state, and list-update motion uses `transform`/`opacity`; reduced-motion and keyboard modal behavior are respected.
+  - Test Strategy: JS smoke assertions for shared shell helpers plus manual keyboard/reduced-motion checks.
+- [x] `FUI-T6` Optimize frontend rendering and polling behavior (owner: `feature-agent`)
+  - Acceptance: overlapping refreshes are prevented, hidden tabs poll more slowly, unchanged data avoids unnecessary DOM rewrites, and P&L redraws only on data changes while hand-history snapshot behavior stays intact.
+  - Test Strategy: Frontend smoke assertions plus manual hidden-tab verification.
+- [x] `FUI-T7` Add browser E2E coverage and update run documentation (owner: `test-agent`)
+  - Acceptance: a minimal Playwright suite covers login, lobby create/open, table seating/control/history, My Bots upload, and responsive layouts; README documents install/run steps.
+  - Test Strategy: `npm run test:e2e` after `npm install` and `npx playwright install chromium`.

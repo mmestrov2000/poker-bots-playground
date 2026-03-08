@@ -11,7 +11,7 @@ from app.api import routes
 from app.auth.config import AuthSettings
 from app.auth.service import AuthService
 from app.auth.store import AuthStore
-from app.main import create_app
+from app.main import NoCacheStaticFiles, _resolve_asset_version, create_app
 from app.services.match_service import MatchService
 from app.services.table_runtime_manager import TableRuntimeManager
 from app.storage.hand_store import HandStore
@@ -190,6 +190,38 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'id="my-bots-upload-feedback"' in my_bots_html
     assert 'id="my-bots-state"' in my_bots_html
     assert "/static/my-bots.js" in my_bots_html
+
+
+def test_frontend_asset_version_uses_content_hash_when_env_is_dev(monkeypatch):
+    monkeypatch.setenv("APP_ASSET_VERSION", "dev")
+    login_response = Response()
+    routes.login(
+        routes.LoginRequest(username="alice", password="correct-horse-battery-staple"),
+        login_response,
+        build_request_with_cookies(),
+    )
+    session_id = extract_session_cookie(login_response)
+    page_request = build_page_request(
+        path="/tables/table-123",
+        cookies={routes.auth_settings.session_cookie_name: session_id},
+    )
+    page = get_page_endpoint("/tables/{table_id}")(page_request, table_id="table-123")
+    body = page.body.decode("utf-8")
+    assert "/static/table-detail.js?v=" in body
+    assert "/static/table-detail.js?v=dev" not in body
+    assert _resolve_asset_version(Path(__file__).resolve().parents[2] / "frontend", "0.1.0") != "dev"
+
+
+def test_static_assets_disable_browser_caching():
+    frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+    static_files = NoCacheStaticFiles(directory=str(frontend_dir), html=False)
+    asset_path = frontend_dir / "table-detail.js"
+    response = static_files.file_response(
+        str(asset_path),
+        asset_path.stat(),
+        {"type": "http", "method": "GET", "headers": []},
+    )
+    assert response.headers["cache-control"] == "no-cache, no-store, must-revalidate"
 
 
 def test_frontend_route_guard_login_logout_navigation_smoke():

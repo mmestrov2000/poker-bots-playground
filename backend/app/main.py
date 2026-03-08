@@ -1,4 +1,5 @@
 import os
+from hashlib import sha256
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -8,6 +9,27 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import routes as api_routes
 from app.api.routes import router as api_router
+
+
+class NoCacheStaticFiles(StaticFiles):
+    def file_response(self, full_path, stat_result, scope, status_code=200):  # type: ignore[override]
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+
+def _resolve_asset_version(frontend_dir: Path, app_version: str) -> str:
+    override = os.getenv("APP_ASSET_VERSION", "").strip()
+    if override and override.lower() != "dev":
+        return override
+
+    digest = sha256()
+    for path in sorted(frontend_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        digest.update(path.relative_to(frontend_dir).as_posix().encode("utf-8"))
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:12] or app_version
 
 
 def create_app() -> FastAPI:
@@ -25,7 +47,8 @@ def create_app() -> FastAPI:
     repo_root = Path(__file__).resolve().parents[2]
     frontend_dir = repo_root / "frontend"
     if frontend_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(frontend_dir), html=False), name="frontend-static")
+        asset_version = _resolve_asset_version(frontend_dir, app.version)
+        app.mount("/static", NoCacheStaticFiles(directory=str(frontend_dir), html=False), name="frontend-static")
         template_files = {
             "login": frontend_dir / "login.html",
             "lobby": frontend_dir / "lobby.html",
@@ -39,7 +62,6 @@ def create_app() -> FastAPI:
         }
 
         def render_template(template_name: str) -> HTMLResponse:
-            asset_version = os.getenv("APP_ASSET_VERSION", app.version)
             html = template_cache[template_name].replace("__ASSET_VERSION__", asset_version)
             response = HTMLResponse(content=html)
             response.headers["Cache-Control"] = "no-cache, must-revalidate"

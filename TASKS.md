@@ -329,6 +329,7 @@ Goal: ensure each lobby table opens and stays on its own isolated runtime state 
   - Add table-scoped live APIs for seats, match state/control, hands, hand detail, P&L, and in-table leaderboard. Done in `backend/app/api/routes.py`.
   - Back each persisted lobby table with its own runtime service and hand-history storage. Done via `backend/app/services/table_runtime_manager.py` and `backend/app/services/match_service.py`.
   - Route seat assignment and live polling by `table_id` so opening table B cannot surface table A state. Done in `frontend/table-detail.js`.
+  - Prevent stale cached table scripts from masking live-routing fixes after rebuilds. Done in `backend/app/main.py` via content-hashed asset versions and no-cache static headers.
   - Add regression coverage for multi-table isolation and table-detail frontend endpoint wiring. Done in `backend/tests/test_api_endpoints.py` and `backend/tests/test_frontend_auth_shell.py`.
   - Acceptance: Opening a selected table consistently shows that table's own seats, match state, hands, P&L, and leaderboard.
   - Test Strategy: Backend `pytest` suite with multi-table API isolation checks and frontend smoke assertions.

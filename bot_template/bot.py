@@ -6,7 +6,7 @@ class PokerBot:
 
     def __init__(self):
         # Track how often each opponent has bet or raised, across the whole session.
-        # Key: player_id (stable across hands).  Value: {"actions": int, "raises": int}
+        # Key: player_id (stable across hands).  Value: {"actions": int, "aggressive_actions": int}
         self.opponent_stats = {}
         self._seen_action_index = -1  # prevents double-counting history entries
 
@@ -44,10 +44,10 @@ class PokerBot:
             amount = event["amount"]
 
             if pid != hero["player_id"]:  # skip your own actions
-                stats = self.opponent_stats.setdefault(pid, {"actions": 0, "raises": 0})
+                stats = self.opponent_stats.setdefault(pid, {"actions": 0, "aggressive_actions": 0})
                 stats["actions"] += 1
                 if action in ("bet", "raise"):
-                    stats["raises"] += 1
+                    stats["aggressive_actions"] += 1
 
         # ── Legal actions ─────────────────────────────────────────────────────
         # Only actions in this list are valid. Use the amounts provided — do not guess.

@@ -1,81 +1,150 @@
 # Bot Template
 
-Upload format expects a `.zip` archive containing `bot.py` at archive root.
+Your bot is a single Python file (`bot.py`) with one class and one method.
 
-## Required contract
-`bot.py` must expose class `PokerBot` with method:
-
-```python
-class PokerBot:
-    def act(self, state: dict) -> dict:
-        ...
-```
-
-Returned dict shape:
-- `action`: one of `fold`, `check`, `call`, `bet`, `raise`
-- `amount`: integer when action requires amount
-
-## Protocol version selection
-Legacy protocol-v1 still works by default. To opt into protocol-v2, declare either:
+## Minimum viable bot
 
 ```python
 BOT_PROTOCOL_VERSION = "2.0"
+
+class PokerBot:
+    def act(self, state: dict) -> dict:
+        legal = {e["action"]: e for e in state["legal_actions"]}
+        if "check" in legal:
+            return {"action": "check"}
+        if "call" in legal:
+            return {"action": "call"}
+        return {"action": "fold"}
 ```
 
-or:
+That's a complete, working bot. The starter `bot.py` in this folder builds on it with opponent tracking.
+
+## Package and upload
+
+```bash
+zip bot.zip bot.py
+```
+
+Go to **My Bots → Upload**, fill in a name and version, and upload `bot.zip`.
+
+`bot.py` must be at the archive root (or inside exactly one top-level folder).
+
+---
+
+## The `state` dict
+
+Every time it is your turn, `act(state)` is called. Here is what `state` contains:
+
+```
+state = {
+  "table": {
+    "street":      "preflop" | "flop" | "turn" | "river",
+    "hand_id":     "hand-42",
+    "button_seat": "1",
+    "small_blind": 50,    # in cents
+    "big_blind":   100
+  },
+
+  "hero": {
+    "player_id":    "player-2",    # your stable ID across hands
+    "hole_cards":   ["Ah", "Ks"],  # your two private cards
+    "stack":        9800,          # your chips remaining (cents)
+    "to_call":      100,           # cost to call
+    "min_raise_to": 200,           # minimum raise total
+    "max_raise_to": 9800           # maximum raise (your full stack)
+  },
+
+  "board": {
+    "cards": ["Kd", "7c", "2h"],   # community cards (empty preflop)
+    "pot":   300                   # current pot (cents)
+  },
+
+  "players": [                     # all seats, including yours
+    {
+      "player_id": "player-1",
+      "stack":     9900,
+      "bet":       100,
+      "folded":    false,
+      "all_in":    false,
+      "is_hero":   false           # true only for your own entry
+    },
+    ...
+  ],
+
+  "legal_actions": [               # only these moves are valid right now
+    {"action": "fold"},
+    {"action": "call",  "min_amount": 100, "max_amount": 100},
+    {"action": "raise", "min_amount": 200, "max_amount": 9800}
+  ],
+
+  "action_history": [              # every action in this hand so far
+    {
+      "index":     0,
+      "street":    "preflop",
+      "player_id": "player-1",
+      "action":    "blind",
+      "amount":    50,
+      "pot_after": 50
+    },
+    ...
+  ]
+}
+```
+
+---
+
+## Returning an action
+
+Return a dict with `"action"` and, for `bet` or `raise`, an `"amount"`:
 
 ```python
-class PokerBot:
-    protocol_version = "2.0"
+return {"action": "fold"}
+return {"action": "check"}
+return {"action": "call"}
+return {"action": "bet",   "amount": 200}
+return {"action": "raise", "amount": 400}
 ```
 
-`bot_template/bot.py` includes both declarations for clarity.
+Always use amounts from `legal_actions`. The call amount is fixed (`min_amount == max_amount`).
+Raise amount must be between `min_amount` and `max_amount`.
 
-## Protocol-v2 payload guide
-The `state` payload for v2 contains:
-- `protocol_version`: `"2.0"`
-- `decision_id`: unique decision key
-- `table`: `table_id`, `hand_id`, `street`, `button_seat`, blind values
-- `hero`: your bot identity and decision bounds (`to_call`, `min_raise_to`, `max_raise_to`)
-- `players`: all seats with stable `player_id` for per-opponent tracking
-- `board`: board cards and current pot
-- `legal_actions`: authoritative action list (`action`, optional `min_amount`/`max_amount`)
-- `action_history`: full current-hand timeline with `index`, `player_id`, action, amount, `pot_after`
-- `meta`: server timestamp and serialized state size in bytes
+---
 
-`legal_actions` is authoritative. Do not assume an action is legal if it is absent.
+## Tracking opponents across turns
 
-## Opponent tracking example
-The starter bot demonstrates a simple parser strategy:
-- track opponents by `players[*].player_id`
-- process only unseen history entries using `action_history[*].index`
-- accumulate per-opponent totals (actions, aggressive actions)
+`action_history` grows as the hand progresses. Use the `index` field to avoid processing the same event twice:
 
-This is enough to implement features like:
-- aggression-based calling/raising thresholds
-- player-specific adjustments keyed by stable `player_id`
+```python
+def __init__(self):
+    self._seen = -1
 
-Use `bot_template/fixtures/sample_v2_state.json` to test parser changes quickly.
-
-## Bot-local persistence expectations
-Bots may use bot-managed local/external persistence, but keep these limits in mind:
-- decision calls are time bounded (`2.0s` default), so persistence I/O in `act()` must be small and predictable
-- incoming context payload size is capped (`64KiB` serialized state)
-- bot local files/process memory are bot-owned only; do not rely on access to platform-private stores/services
-- local disk persistence may be ephemeral depending on runtime lifecycle; design for cold starts and missing files
-
-The starter bot includes optional helpers:
-- `save_local_state(path)`
-- `load_local_state(path)`
-
-## Package example
-```bash
-cd bot_template
-zip -r sample_bot.zip bot.py
+def act(self, state):
+    for event in state["action_history"]:
+        if event["index"] <= self._seen:
+            continue
+        self._seen = event["index"]
+        # now process event["player_id"], event["action"], event["amount"]
 ```
 
-## Quick smoke run
-From repo root:
+`player_id` is stable for the entire session, so you can accumulate per-opponent stats across hands.
+
+---
+
+## Limits
+
+| | |
+|---|---|
+| Decision timeout | 2 seconds |
+| Memory | 256 MB |
+| State payload | 64 KB |
+| ZIP upload | 10 MB |
+| Uncompressed archive | 2 MB |
+
+---
+
+## Test locally
+
+From the repo root:
 
 ```bash
 PYTHONPATH=. python - <<'PY'
@@ -86,6 +155,5 @@ from bot_template.bot import PokerBot
 state = json.loads(Path("bot_template/fixtures/sample_v2_state.json").read_text())
 bot = PokerBot()
 print(bot.act(state))
-print(bot.opponent_stats)
 PY
 ```

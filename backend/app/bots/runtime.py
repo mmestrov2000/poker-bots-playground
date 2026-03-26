@@ -80,6 +80,8 @@ class BotRunner:
             str(self.memory_limit_bytes),
             "--cpu-seconds",
             str(max(1, int(self.timeout_seconds) + 1)),
+            "--timeout-seconds",
+            str(self.timeout_seconds),
         ]
         try:
             completed = subprocess.run(

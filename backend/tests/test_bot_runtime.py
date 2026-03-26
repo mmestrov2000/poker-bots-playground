@@ -8,7 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from app.bots.loader import BotLoadError, load_bot_from_zip, resolve_bot_protocol_from_zip
+from app.bots.loader import (
+    BotLoadError,
+    has_manifest_contract,
+    load_bot_from_zip,
+    prepare_bot_archive,
+    resolve_bot_protocol_from_zip,
+)
 from app.bots.runtime import MAX_STATE_BYTES, BotRunner
 
 
@@ -23,6 +29,15 @@ def _zip_bot_nested(tmp_path: Path, name: str, body: str) -> Path:
     zip_path = tmp_path / name
     with zipfile.ZipFile(zip_path, "w") as archive:
         archive.writestr("my_bot/bot.py", body)
+    return zip_path
+
+
+def _zip_stdio_bot(tmp_path: Path, name: str, body: str, *, command: list[str] | None = None) -> Path:
+    zip_path = tmp_path / name
+    manifest = {"command": command or ["python", "bot.py"], "protocol_version": "2.0"}
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("bot.json", json.dumps(manifest))
+        archive.writestr("bot.py", body)
     return zip_path
 
 
@@ -97,6 +112,33 @@ def test_resolve_bot_protocol_from_zip_without_importing_bot(tmp_path: Path) -> 
 
     protocol = resolve_bot_protocol_from_zip(zip_path)
     assert protocol == "2.0"
+
+
+def test_prepare_bot_archive_happy_path(tmp_path: Path) -> None:
+    body = "\n".join(
+        [
+            "import json",
+            "import sys",
+            "state = json.load(sys.stdin)",
+            "json.dump({'action': 'check'}, sys.stdout)",
+        ]
+    )
+    zip_path = _zip_stdio_bot(tmp_path, "stdio.zip", body)
+
+    prepared = prepare_bot_archive(zip_path)
+    assert prepared.protocol_version == "2.0"
+    assert prepared.command[0] == "python"
+    assert prepared.command[1:] == ("bot.py",)
+    assert prepared.working_dir == prepared.extract_dir
+
+
+def test_has_manifest_contract_detects_stdio_bots(tmp_path: Path) -> None:
+    zip_path = _zip_stdio_bot(
+        tmp_path,
+        "stdio.zip",
+        "import json\nimport sys\njson.dump({'action': 'check'}, sys.stdout)\n",
+    )
+    assert has_manifest_contract(zip_path) is True
 
 
 def test_bot_runner_timeout_and_error() -> None:
@@ -249,3 +291,68 @@ def test_bot_runner_subprocess_cleans_unpack_directories(tmp_path: Path) -> None
     result = runner.act({"legal_actions": ["check"]})
     assert result["action"] == "check"
     assert list(tmp_path.glob("unpacked_*")) == []
+
+
+def test_bot_runner_subprocess_stdio_bot_happy_path(tmp_path: Path) -> None:
+    body = "\n".join(
+        [
+            "import json",
+            "import sys",
+            "state = json.load(sys.stdin)",
+            "legal = {entry['action'] for entry in state['legal_actions']}",
+            "json.dump({'action': 'check' if 'check' in legal else 'fold'}, sys.stdout)",
+        ]
+    )
+    zip_path = _zip_stdio_bot(tmp_path, "stdio.zip", body)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.2,
+    )
+    result = runner.act({"legal_actions": [{"action": "check"}]})
+    assert result["action"] == "check"
+
+
+def test_bot_runner_subprocess_stdio_bot_timeout(tmp_path: Path) -> None:
+    body = "\n".join(
+        [
+            "import json",
+            "import sys",
+            "import time",
+            "json.load(sys.stdin)",
+            "time.sleep(5)",
+            "json.dump({'action': 'check'}, sys.stdout)",
+        ]
+    )
+    zip_path = _zip_stdio_bot(tmp_path, "slow-stdio.zip", body)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.05,
+    )
+    result = runner.act({"legal_actions": [{"action": "check"}]})
+    assert result["action"] == "fold"
+    assert result.get("error") == "timeout"
+
+
+def test_bot_runner_subprocess_stdio_bot_rejects_bad_stdout(tmp_path: Path) -> None:
+    body = "\n".join(
+        [
+            "import json",
+            "import sys",
+            "json.load(sys.stdin)",
+            "sys.stdout.write('not-json')",
+        ]
+    )
+    zip_path = _zip_stdio_bot(tmp_path, "bad-stdout.zip", body)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.2,
+    )
+    result = runner.act({"legal_actions": [{"action": "check"}]})
+    assert result["action"] == "fold"
+    assert result.get("error") == "runtime_malformed_output"

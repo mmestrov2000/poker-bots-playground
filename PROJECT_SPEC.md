@@ -42,12 +42,12 @@ Users upload bots into Seats 1-6. Once at least two seats are filled, the backen
 - Default blinds are `0.5/1`.
 - Cards are shuffled with secure random generation.
 - Hands run continuously until a bot is replaced or match reset.
-- Uploaded bots follow a predefined template contract.
+- Uploaded bots follow a predefined stdin/stdout JSON contract packaged in a `.zip`.
 
 ## Functional Requirements
 - `FR-01`: Web UI displays Seat 1-6 upload cards with current status.
 - `FR-02`: Each seat accepts a bot package upload (`.zip`) and shows upload result.
-- `FR-03`: Backend validates upload shape (required entrypoint file and class/function signature).
+- `FR-03`: Backend validates upload shape (required manifest/entrypoint and action protocol compatibility).
 - `FR-04`: Match starts automatically when at least two seats contain valid bots.
 - `FR-05`: Engine runs No-Limit Texas Hold'em hands for 2-6 players with random shuffles.
 - `FR-06`: After each hand, backend stores:
@@ -75,18 +75,23 @@ Users upload bots into Seats 1-6. Once at least two seats are filled, the backen
 ## Bot Contract (MVP)
 Bot package requirements:
 - Upload a `.zip` file.
-- Include `bot.py` at package root.
-- Expose class `PokerBot` with method:
+- Include `bot.json` at package root (or inside exactly one top-level folder).
+- `bot.json` declares the command the server should execute per decision, for example:
 
-```python
-class PokerBot:
-    def act(self, state: dict) -> dict:
-        """Return {'action': 'fold|check|call|bet|raise', 'amount': int} when needed."""
+```json
+{
+  "command": ["python", "bot.py"],
+  "protocol_version": "2.0"
+}
 ```
 
 Runtime behavior:
+- The server runs the declared command once per decision.
+- The bot reads a single state JSON object from stdin.
+- The bot writes a single action JSON object to stdout.
 - Each action call has a timeout (default `2s`).
 - Invalid responses are treated as failed action and resolved safely by engine fallback.
+- Legacy Python `PokerBot.act(state)` archives remain accepted temporarily as a compatibility path.
 
 ## API Surface (MVP)
 - `GET /api/v1/health`
@@ -110,7 +115,7 @@ Runtime behavior:
 - [ ] `AC-08` Leaderboard shows BB/hand and toggles P&L lines per bot.
 
 ## Risks and Open Questions
-- Running untrusted uploaded Python code is high risk; sandboxing must be treated as a first-class hardening task.
+- Running untrusted uploaded bot code is high risk; sandboxing must be treated as a first-class hardening task.
 - Exact hand-history formatting convention (PokerStars-like vs custom readable standard) is to be finalized; MVP will use a consistent custom text format.
 - Long-running in-memory state may require cleanup/rotation once hand volume grows.
 
@@ -172,7 +177,7 @@ This section extends MVP scope for the next implementation batch. Existing MVP r
 - `FR-22`: Leaderboard includes bots that have played historically, not only currently seated bots.
 - `FR-23`: Bot runtime is isolated from API process (separate execution boundary and resource/time limits).
 - `FR-24`: Server sends bots structured table context including player ids, seats, stacks, board, pot, legal actions, and complete prior hand actions.
-- `FR-25`: Bot action interface remains backward compatible where possible, with explicit versioning for new context fields.
+- `FR-25`: Bot action interface remains backward compatible where possible, with explicit versioning for new context fields and a legacy adapter for older Python-class bots.
 - `FR-26`: All new data (users, bots, tables, leaderboard aggregates) is persisted across process restarts.
 - `FR-27`: Authentication for Batch 2 is local username/password only (no OAuth in this batch).
 - `FR-28`: Bot source packages and implementation details are private to owners and never exposed in public APIs.
@@ -194,9 +199,9 @@ This section extends MVP scope for the next implementation batch. Existing MVP r
 
 ## Bot Protocol v2 Contract (M5-T1 Locked)
 ### Version Negotiation and Compatibility
-- Bot interface remains `PokerBot.act(state: dict) -> dict`.
-- Default protocol is legacy v1 when no explicit protocol declaration exists.
-- Bot opts into v2 by declaring either:
+- Primary bot interface is a declared command in `bot.json` that receives one state JSON object on stdin and returns one action JSON object on stdout.
+- Manifest bots declare protocol with `bot.json.protocol_version`; omitted values default to `"2.0"`.
+- Legacy Python bots remain supported temporarily and still opt into v2 by declaring either:
   - module constant `BOT_PROTOCOL_VERSION = "2.0"`, or
   - class attribute `PokerBot.protocol_version = "2.0"`.
 - Unsupported protocol values are rejected during upload validation with a clear error.

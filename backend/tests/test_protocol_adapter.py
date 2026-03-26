@@ -238,6 +238,38 @@ def test_validate_bot_archive_accepts_supported_class_protocol() -> None:
     assert error is None
 
 
+def test_validate_bot_archive_accepts_stdio_manifest_contract() -> None:
+    payload = _build_zip(
+        {
+            "bot.json": '{"command":["python","bot.py"],"protocol_version":"2.0"}',
+            "bot.py": "\n".join(
+                [
+                    "import json",
+                    "import sys",
+                    "state = json.load(sys.stdin)",
+                    "json.dump({'action': 'check'}, sys.stdout)",
+                ]
+            ),
+        }
+    )
+
+    is_valid, error = validate_bot_archive(payload)
+    assert is_valid is True
+    assert error is None
+
+
+def test_validate_bot_archive_rejects_stdio_manifest_with_missing_command_target() -> None:
+    payload = _build_zip(
+        {
+            "bot.json": '{"command":["./missing.py"],"protocol_version":"2.0"}',
+        }
+    )
+
+    is_valid, error = validate_bot_archive(payload)
+    assert is_valid is False
+    assert error == "bot.json command entry './missing.py' was not found in the archive"
+
+
 def test_extract_declared_protocol_uses_module_precedence() -> None:
     tree = ast.parse(
         "\n".join(

@@ -89,7 +89,7 @@ PYTHONPATH=. uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 Open `http://localhost:8000`.
 
 ## Bot Upload Contract
-Upload `.zip` with `bot.py` at root and class `PokerBot`.
+Upload `.zip` with `bot.json` plus your bot script(s). The server runs the declared command, sends decision state JSON on stdin, and expects action JSON on stdout.
 See `bot_template/README.md`.
 
 ## Current State

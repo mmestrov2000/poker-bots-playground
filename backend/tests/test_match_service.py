@@ -1,4 +1,5 @@
 import zipfile
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
@@ -12,6 +13,14 @@ from app.storage.hand_store import HandStore
 def _write_bot_zip(tmp_path: Path, name: str, body: str) -> Path:
     zip_path = tmp_path / name
     with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("bot.py", body)
+    return zip_path
+
+
+def _write_stdio_bot_zip(tmp_path: Path, name: str, body: str) -> Path:
+    zip_path = tmp_path / name
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("bot.json", json.dumps({"command": ["python", "bot.py"], "protocol_version": "2.0"}))
         archive.writestr("bot.py", body)
     return zip_path
 
@@ -96,6 +105,36 @@ def test_reset_match_clears_state(tmp_path: Path) -> None:
     assert match["status"] == "waiting"
     assert match["hands_played"] == 0
     assert all(not seat["ready"] for seat in seats)
+
+
+def test_registering_stdio_bots_plays_hands(tmp_path: Path) -> None:
+    service = MatchService(table_id="table-1", hand_store=HandStore(base_dir=tmp_path / "hands"))
+    service.HAND_INTERVAL_SECONDS = 0.05
+
+    bot_body = "\n".join(
+        [
+            "import json",
+            "import sys",
+            "state = json.load(sys.stdin)",
+            "legal = {entry['action'] for entry in state['legal_actions']}",
+            "json.dump({'action': 'check' if 'check' in legal else 'call' if 'call' in legal else 'fold'}, sys.stdout)",
+        ]
+    )
+    bot_a = _write_stdio_bot_zip(tmp_path, "alpha-stdio.zip", bot_body)
+    bot_b = _write_stdio_bot_zip(tmp_path, "beta-stdio.zip", bot_body)
+
+    service.register_bot("1", "alpha-stdio.zip", bot_path=bot_a)
+    service.register_bot("2", "beta-stdio.zip", bot_path=bot_b)
+
+    service.start_match()
+    sleep(0.15)
+    match = service.get_match()
+    hands = service.list_hands(limit=10)
+
+    assert match["status"] == "running"
+    assert len(hands) >= 1
+
+    service.reset_match()
 
 
 def test_list_hands_paginates_with_snapshot(tmp_path: Path) -> None:

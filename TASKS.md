@@ -358,3 +358,15 @@ Goal: upgrade the full static frontend into a premium poker-arena experience wit
 - [x] `FUI-T7` Add browser E2E coverage and update run documentation (owner: `test-agent`)
   - Acceptance: a minimal Playwright suite covers login, lobby create/open, table seating/control/history, My Bots upload, and responsive layouts; README documents install/run steps.
   - Test Strategy: `npm run test:e2e` after `npm install` and `npx playwright install chromium`.
+
+## Feature: Stdio Bot Runtime Contract
+Goal: make bot execution explicitly process-based by running declared commands over stdin/stdout JSON while keeping a temporary legacy bridge for older Python class bots.
+
+- [x] `FSTDIO-T1` Implement manifest-driven stdio bot execution and update docs/tests (owner: `feature-agent`)
+  - Subtasks:
+  - Add `bot.json` manifest parsing/validation with command-array execution support. Done in `backend/app/bots/manifest.py`, `backend/app/bots/validator.py`, and `backend/app/bots/loader.py`.
+  - Execute manifest bots through the sandbox over stdin/stdout JSON without touching engine action resolution. Done in `backend/app/bots/sandbox.py` and `backend/app/bots/runtime.py`.
+  - Keep legacy `PokerBot.act()` uploads working as a compatibility fallback during migration. Done via manifest-first detection with legacy loader fallback in bot validation/runtime.
+  - Update starter template, primary docs, and regression coverage for the new contract. Done in `bot_template/`, `README.md`, `PROJECT_SPEC.md`, `ARCHITECTURE.md`, and backend tests.
+  - Acceptance: newly uploaded manifest bots run through the existing match loop with the current v2 payload, and malformed manifest/runtime failures degrade safely.
+  - Test Strategy: targeted backend `pytest` for bot runtime, protocol validation, match service, API uploads, and template smoke behavior.

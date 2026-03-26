@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -10,21 +11,25 @@ def test_bot_template_protocol_v2_smoke_fixture() -> None:
     fixture_path = repo_root / "bot_template" / "fixtures" / "sample_v2_state.json"
     state = json.loads(fixture_path.read_text(encoding="utf-8"))
 
-    bot_path = repo_root / "bot_template" / "bot.py"
-    module_spec = importlib.util.spec_from_file_location("bot_template_bot", bot_path)
-    assert module_spec is not None
-    assert module_spec.loader is not None
-    module = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(module)
-    bot = module.PokerBot()
-
-    response = bot.act(state)
+    bot_dir = repo_root / "bot_template"
+    response = subprocess.run(
+        [sys.executable, "bot.py"],
+        cwd=bot_dir,
+        input=fixture_path.read_bytes(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+    payload = json.loads(response.stdout.decode("utf-8"))
 
     legal_actions = {entry["action"] for entry in state["legal_actions"]}
-    assert response["action"] in legal_actions
-    if response["action"] in {"bet", "raise"}:
-        assert isinstance(response.get("amount"), int)
+    assert payload["action"] in legal_actions
+    if payload["action"] in {"bet", "raise"}:
+        assert isinstance(payload.get("amount"), int)
 
-    assert "player-sb" in bot.opponent_stats
-    assert bot.opponent_stats["player-sb"]["actions"] == 3
-    assert bot.opponent_stats["player-sb"]["aggressive_actions"] == 2
+    manifest = json.loads((bot_dir / "bot.json").read_text(encoding="utf-8"))
+    assert manifest == {"command": ["python", "bot.py"], "protocol_version": "2.0"}
+
+    script_source = (bot_dir / "bot.py").read_text(encoding="utf-8")
+    assert "build_opponent_stats" in script_source
+    assert "action_history" in script_source

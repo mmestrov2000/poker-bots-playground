@@ -4,6 +4,7 @@ import ast
 import io
 import zipfile
 
+from app.bots.manifest import parse_manifest, select_manifest_member
 from app.bots.protocol import extract_declared_protocol_from_ast
 from app.bots.security import MAX_BOT_SOURCE_BYTES, validate_archive_infos
 
@@ -17,6 +18,21 @@ def validate_bot_archive(payload: bytes) -> tuple[bool, str | None]:
             is_valid, error_message = validate_archive_infos(archive.infolist())
             if not is_valid:
                 return False, error_message
+
+            manifest_member, manifest_error = select_manifest_member(archive.namelist())
+            if manifest_member is not None:
+                manifest_info = archive.getinfo(manifest_member)
+                with archive.open(manifest_info) as manifest_file:
+                    manifest, error = parse_manifest(
+                        raw_manifest=manifest_file.read(),
+                        manifest_member=manifest_member,
+                        archive_names=archive.namelist(),
+                    )
+                if manifest is None:
+                    return False, error or "Invalid bot manifest"
+                return True, None
+            if manifest_error:
+                return False, manifest_error
 
             bot_member, selection_error = select_bot_member(archive.namelist())
             if bot_member is None:

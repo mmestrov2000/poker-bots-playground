@@ -1,73 +1,59 @@
-BOT_PROTOCOL_VERSION = "2.0"
+#!/usr/bin/env python3
+
+import json
+import sys
 
 
-class PokerBot:
-    """Starter bot — edit `act()` to implement your strategy."""
+def build_opponent_stats(state: dict) -> dict[str, dict[str, int]]:
+    hero_id = state["hero"]["player_id"]
+    stats: dict[str, dict[str, int]] = {}
+    for event in state["action_history"]:
+        player_id = event["player_id"]
+        if player_id == hero_id:
+            continue
+        player_stats = stats.setdefault(player_id, {"actions": 0, "aggressive_actions": 0})
+        player_stats["actions"] += 1
+        if event["action"] in {"bet", "raise"}:
+            player_stats["aggressive_actions"] += 1
+    return stats
 
-    def __init__(self):
-        # Track how often each opponent has bet or raised, across the whole session.
-        # Key: player_id (stable across hands).  Value: {"actions": int, "aggressive_actions": int}
-        self.opponent_stats = {}
-        self._seen_action_index = -1  # prevents double-counting history entries
 
-    def act(self, state: dict) -> dict:
-        """Called every time it is your turn. Return the action you want to take."""
+def choose_action(state: dict) -> dict:
+    hero = state["hero"]
+    to_call = hero["to_call"]
+    pot = state["board"]["pot"]
+    legal = {entry["action"]: entry for entry in state["legal_actions"]}
 
-        # ── My hand ──────────────────────────────────────────────────────────
-        hero      = state["hero"]
-        my_cards  = hero["hole_cards"]    # e.g. ["Ah", "Ks"]
-        my_stack  = hero["stack"]         # chips remaining, in cents
-        to_call   = hero["to_call"]       # amount needed to call
-        min_raise = hero["min_raise_to"]  # minimum raise-to amount
+    opponent_stats = build_opponent_stats(state)
+    aggressive_opponents = sum(
+        1
+        for values in opponent_stats.values()
+        if values["aggressive_actions"] * 2 >= values["actions"] and values["actions"] > 0
+    )
 
-        # ── The board ────────────────────────────────────────────────────────
-        community = state["board"]["cards"]  # [] preflop, up to 5 cards by river
-        pot       = state["board"]["pot"]
-        street    = state["table"]["street"]  # "preflop", "flop", "turn", "river"
+    if "check" in legal:
+        return {"action": "check"}
 
-        # ── Other players ────────────────────────────────────────────────────
-        for player in state["players"]:
-            if player["is_hero"]:
-                continue
-            # player["player_id"] is stable — safe to use as a long-term tracking key
-            # Other fields: player["stack"], player["bet"], player["folded"], player["all_in"]
+    if "call" in legal and aggressive_opponents == 0 and to_call <= pot // 4:
+        return {"action": "call"}
 
-        # ── Action history (new events only) ─────────────────────────────────
-        # action_history grows throughout the hand; use "index" to skip already-seen events.
-        for event in state["action_history"]:
-            if event["index"] <= self._seen_action_index:
-                continue
-            self._seen_action_index = event["index"]
+    if "fold" in legal:
+        return {"action": "fold"}
 
-            pid    = event["player_id"]
-            action = event["action"]  # "blind", "fold", "check", "call", "bet", "raise"
-            amount = event["amount"]
+    first = next(iter(legal.values()))
+    response = {"action": first["action"]}
+    if "min_amount" in first:
+        response["amount"] = first["min_amount"]
+    return response
 
-            if pid != hero["player_id"]:  # skip your own actions
-                stats = self.opponent_stats.setdefault(pid, {"actions": 0, "aggressive_actions": 0})
-                stats["actions"] += 1
-                if action in ("bet", "raise"):
-                    stats["aggressive_actions"] += 1
 
-        # ── Legal actions ─────────────────────────────────────────────────────
-        # Only actions in this list are valid. Use the amounts provided — do not guess.
-        # call  → min_amount == max_amount (fixed cost)
-        # raise → min_amount is the minimum, max_amount is your stack
-        legal = {entry["action"]: entry for entry in state["legal_actions"]}
+def main() -> int:
+    state = json.load(sys.stdin)
+    response = choose_action(state)
+    json.dump(response, sys.stdout, separators=(",", ":"))
+    sys.stdout.write("\n")
+    return 0
 
-        # ── Your strategy goes here ───────────────────────────────────────────
-        if "check" in legal:
-            return {"action": "check"}
 
-        if "call" in legal and to_call <= pot // 4:
-            return {"action": "call"}
-
-        if "fold" in legal:
-            return {"action": "fold"}
-
-        # Fallback: take the first legal action with the minimum valid amount.
-        first = next(iter(legal.values()))
-        response = {"action": first["action"]}
-        if "min_amount" in first:
-            response["amount"] = first["min_amount"]
-        return response
+if __name__ == "__main__":
+    raise SystemExit(main())

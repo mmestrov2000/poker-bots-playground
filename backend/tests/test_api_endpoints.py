@@ -192,6 +192,27 @@ class PokerBot:
 
 
 @pytest.mark.anyio
+async def test_upload_accepts_stdio_manifest_bot():
+    payload = build_zip(
+        {
+            "bot.json": '{"command":["python","bot.py"],"protocol_version":"2.0"}',
+            "bot.py": """
+import json
+import sys
+
+state = json.load(sys.stdin)
+legal = {entry["action"] for entry in state["legal_actions"]}
+json.dump({"action": "check" if "check" in legal else "fold"}, sys.stdout)
+""",
+        }
+    )
+
+    response = await routes.upload_bot("1", build_upload_file("stdio.zip", payload))
+    assert response["seat"]["ready"] is True
+    assert response["seat"]["bot_name"] == "stdio.zip"
+
+
+@pytest.mark.anyio
 async def test_upload_rejects_invalid_zip_archive():
     with pytest.raises(HTTPException) as exc_info:
         await routes.upload_bot("1", build_upload_file("bot.zip", b"not-a-real-zip"))
@@ -220,6 +241,15 @@ async def test_upload_rejects_archives_with_multiple_bot_candidates():
         await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Archive contains multiple bot.py candidates"
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_stdio_manifest_with_missing_command_target():
+    payload = build_zip({"bot.json": '{"command":["./missing.py"],"protocol_version":"2.0"}'})
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.upload_bot("1", build_upload_file("bot.zip", payload))
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "bot.json command entry './missing.py' was not found in the archive"
 
 
 @pytest.mark.anyio

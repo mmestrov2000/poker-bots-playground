@@ -40,7 +40,8 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 - `frontend/app.js` - API calls and UI state updates.
 - `frontend/styles.css` - base UI styles.
 - `bot_template/` - starter upload package reference.
-- `bot_template/bot.py` - starter bot contract implementation.
+- `bot_template/bot.py` - starter stdin/stdout bot implementation.
+- `bot_template/bot.json` - starter bot manifest declaring command + protocol.
 - `bot_template/README.md` - packaging and upload instructions.
 - `runtime/uploads/` - uploaded bot packages.
 - `runtime/hands/` - generated hand history text files.
@@ -90,7 +91,7 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 
 ## Security and Isolation
 - Restrict upload size and accepted archive type.
-- Validate expected bot entrypoint (`bot.py`, `PokerBot`).
+- Validate expected bot manifest (`bot.json`) and command contract, with legacy `bot.py`/`PokerBot` compatibility during migration.
 - Execute bot actions behind timeout guards.
 - Log bot exceptions and treat them as invalid actions.
 - Future hardening path: container-per-bot sandbox with no network and resource limits.
@@ -119,7 +120,7 @@ This section defines architectural additions for authentication, bot ownership, 
 - `Table Lobby Service`: create/list/open table management.
 - `Leaderboard Service`: persistent aggregate performance (`bb/hand`) per bot.
 - `Bot Runtime Supervisor`: isolated bot execution boundary with strict resource/timeout limits.
-- `Protocol Adapter`: builds normalized state payload for bot `act()` with full player/action context.
+- `Protocol Adapter`: builds normalized state payload for bot stdin/stdout execution with full player/action context.
 
 ## Extended Runtime Flow
 1. User logs in via `POST /api/v1/auth/login`; backend verifies username/password and issues authenticated session/token.
@@ -201,7 +202,7 @@ This section defines architectural additions for authentication, bot ownership, 
   - per-street hand state from `engine.game`
   - per-action timeline from engine `ActionEvent` stream
 - Output target:
-  - versioned payload for `BotRunner.act(state)` where `state` is either legacy v1 or protocol v2.
+  - versioned payload for `BotRunner.act(state)` where `state` is either legacy v1 or protocol v2 before being forwarded into the bot transport.
 
 ### v2 Mapping Rules
 - `table.hand_id`, `table.street`, blind values, and button seat map directly from engine round state.
@@ -212,9 +213,10 @@ This section defines architectural additions for authentication, bot ownership, 
 
 ### Compatibility Rules
 - Version selection:
-  - use `BOT_PROTOCOL_VERSION` module constant when present;
+  - use `bot.json.protocol_version` for manifest-driven stdio bots;
+  - otherwise use `BOT_PROTOCOL_VERSION` module constant when present;
   - otherwise use `PokerBot.protocol_version` class attribute when present;
-  - otherwise default to legacy v1 payload.
+  - otherwise default to legacy v1 payload for legacy Python bots.
 - Unsupported protocol declarations fail validation at upload time.
 - Legacy v1 payload shape must remain unchanged while compatibility mode exists.
 

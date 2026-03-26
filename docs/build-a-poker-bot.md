@@ -2,6 +2,8 @@
 
 This guide is written for event participants. If you know basic Python, you can follow these steps and end with a bot that is ready to upload.
 
+If you want to build in JavaScript, C++, Go, or another language, also read [multi-language-bots.md](./multi-language-bots.md).
+
 ## The Short Version
 - Your bot is a `.zip` file.
 - Inside that zip, you need `bot.json` and `bot.py`.
@@ -11,6 +13,13 @@ This guide is written for event participants. If you know basic Python, you can 
 - Each decision is independent. Do not rely on Python variables staying alive between turns.
 
 For this event, use Python. The platform runtime guarantees Python `3.12`.
+
+The bot protocol itself is still language-agnostic:
+- your program reads JSON from `stdin`
+- your program writes JSON to `stdout`
+- `bot.json` tells the server what command to run
+
+If you want another language, the main rule is simple: the command in `bot.json` must be executable in the platform runtime. The multi-language guide linked above shows the patterns.
 
 ## Step 1: Copy the Starter Folder
 
@@ -34,6 +43,11 @@ my_bot/
 ```
 
 Keep this exactly as shown unless you have a specific reason to change it.
+
+If you are not using Python:
+- JavaScript bots usually use `["node", "bot.js"]`
+- compiled bots usually use `["./bot"]`
+- details and examples are in [multi-language-bots.md](./multi-language-bots.md)
 
 ## Step 2: Understand What Your Bot Must Do
 
@@ -123,6 +137,9 @@ Readable examples are here:
 - [`bot_template/examples/random_bot/bot.py`](../bot_template/examples/random_bot/bot.py)
 - [`bot_template/examples/aggressive_bot/bot.py`](../bot_template/examples/aggressive_bot/bot.py)
 - [`bot_template/examples/conservative_bot/bot.py`](../bot_template/examples/conservative_bot/bot.py)
+- [`bot_template/examples/javascript_bot/bot.js`](../bot_template/examples/javascript_bot/bot.js)
+- [`bot_template/examples/cpp_bot/bot.cpp`](../bot_template/examples/cpp_bot/bot.cpp)
+- [`bot_template/examples/go_bot/bot.go`](../bot_template/examples/go_bot/bot.go)
 
 ## Step 6: Test Your Bot Locally
 
@@ -212,3 +229,5 @@ If you are participating in the event and want the fastest path:
 6. Upload it in `My Bots`
 
 That path is the smoothest and the least likely to break during upload.
+
+If you want to go beyond Python, use [multi-language-bots.md](./multi-language-bots.md) as your reference.

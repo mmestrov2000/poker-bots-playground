@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import time
 import zipfile
 from pathlib import Path
@@ -255,3 +256,36 @@ def test_bot_runner_subprocess_cleans_unpack_directories(tmp_path: Path) -> None
     result = runner.act({"legal_actions": [{"action": "check"}]})
     assert result["action"] == "check"
     assert list(tmp_path.glob("unpacked_*")) == []
+
+
+def test_bot_runner_subprocess_supports_archive_relative_executable(tmp_path: Path) -> None:
+    zip_path = tmp_path / "native-like.zip"
+    manifest = {"command": ["./bot"], "protocol_version": "2.0"}
+    body = "\n".join(
+        [
+            "#!/usr/bin/env python",
+            "import json",
+            "import sys",
+            "state = json.load(sys.stdin)",
+            "legal = {entry['action'] for entry in state['legal_actions']}",
+            "json.dump({'action': 'check' if 'check' in legal else 'fold'}, sys.stdout)",
+        ]
+    )
+
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("bot.json", json.dumps(manifest))
+        info = zipfile.ZipInfo("bot")
+        info.create_system = 3
+        info.external_attr = ((stat.S_IFREG | 0o755) << 16)
+        archive.writestr(info, body)
+
+    prepared = prepare_bot_archive(zip_path)
+    assert os.access(prepared.command[0], os.X_OK)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.2,
+    )
+    result = runner.act({"legal_actions": [{"action": "check"}]})
+    assert result["action"] == "check"

@@ -33,3 +33,19 @@ def test_bot_template_protocol_v2_smoke_fixture() -> None:
     script_source = (bot_dir / "bot.py").read_text(encoding="utf-8")
     assert "build_opponent_stats" in script_source
     assert "action_history" in script_source
+
+
+def test_multilanguage_example_manifests_exist() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    examples_root = repo_root / "bot_template" / "examples"
+
+    manifests = {
+        "javascript_bot": {"command": ["node", "bot.js"], "protocol_version": "2.0"},
+        "cpp_bot": {"command": ["./bot"], "protocol_version": "2.0"},
+        "go_bot": {"command": ["./bot"], "protocol_version": "2.0"},
+    }
+
+    for name, expected in manifests.items():
+        manifest_path = examples_root / name / "bot.json"
+        assert manifest_path.exists()
+        assert json.loads(manifest_path.read_text(encoding="utf-8")) == expected

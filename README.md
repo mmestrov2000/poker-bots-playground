@@ -6,6 +6,7 @@ Poker Bots Playground is a web platform for 2-6 player No-Limit Texas Hold'em bo
 
 ### If you are building a bot for the event
 - Read the step-by-step guide: [docs/build-a-poker-bot.md](docs/build-a-poker-bot.md)
+- If you want JavaScript, C++, Go, or another language: [docs/multi-language-bots.md](docs/multi-language-bots.md)
 - Start from the starter package: [bot_template/](bot_template/)
 - Browse readable example bots: [bot_template/examples/](bot_template/examples/)
 - Use upload-ready sample archives: [bot_template/bots/](bot_template/bots/)
@@ -16,7 +17,9 @@ Poker Bots Playground is a web platform for 2-6 player No-Limit Texas Hold'em bo
 - On every decision, the server runs your declared command once.
 - Your bot reads one state JSON object from `stdin`.
 - Your bot writes one action JSON object to `stdout`.
+- The transport is language-agnostic.
 - The current runtime guarantees Python `3.12`, so the recommended event path is `["python", "bot.py"]`.
+- Other languages work when their executable is available in the runtime. Examples and packaging notes are in [docs/multi-language-bots.md](docs/multi-language-bots.md).
 
 Example `bot.json`:
 

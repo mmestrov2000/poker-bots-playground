@@ -69,6 +69,7 @@ def extract_archive_safely(archive: ZipFile, destination: Path) -> None:
                         f"Archive uncompressed size exceeds {MAX_ARCHIVE_UNCOMPRESSED_BYTES} byte limit"
                     )
                 target.write(chunk)
+        _apply_member_permissions(info, target_path)
 
 
 def normalize_archive_member(filename: str) -> tuple[PurePosixPath | None, str | None]:
@@ -89,3 +90,10 @@ def normalize_archive_member(filename: str) -> tuple[PurePosixPath | None, str |
 def is_symlink_entry(info: ZipInfo) -> bool:
     mode = (info.external_attr >> 16) & 0o170000
     return S_ISLNK(mode)
+
+
+def _apply_member_permissions(info: ZipInfo, path: Path) -> None:
+    mode = (info.external_attr >> 16) & 0o777
+    if not mode:
+        return
+    path.chmod(mode)

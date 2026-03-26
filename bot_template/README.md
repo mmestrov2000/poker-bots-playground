@@ -3,6 +3,7 @@
 Your bot is a ZIP package that declares how to run itself and communicates over stdin/stdout JSON.
 
 If you want a guided walkthrough, read [../docs/build-a-poker-bot.md](../docs/build-a-poker-bot.md) first.
+If you want language-specific packaging examples, read [../docs/multi-language-bots.md](../docs/multi-language-bots.md).
 
 ## Package layout
 
@@ -23,6 +24,11 @@ This folder contains the minimum working package:
 ```
 
 The command is executed from the package root. Use a command array, not a shell string.
+
+Examples:
+- Python: `["python", "bot.py"]`
+- JavaScript: `["node", "bot.js"]` if Node.js is installed in the runtime
+- Compiled bot: `["./bot"]` if you bundle a Linux executable inside the zip
 
 ## Minimum viable bot
 
@@ -55,6 +61,12 @@ zip bot.zip bot.json bot.py
 Go to **My Bots → Upload**, fill in a name and version, and upload `bot.zip`.
 
 `bot.json` must exist at the archive root or inside exactly one top-level folder. Relative paths in `command[0]` are resolved from the folder that contains `bot.json`.
+
+Important:
+- The contract is language-agnostic.
+- The current platform runtime guarantees Python `3.12`.
+- Other languages are possible when their interpreter or executable is available in the runtime.
+- Bundled native executables keep their executable bit when the archive is extracted.
 
 ## The state JSON
 

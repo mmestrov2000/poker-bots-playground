@@ -6,12 +6,12 @@ import sys
 from pathlib import Path
 
 
-def test_bot_template_protocol_v2_smoke_fixture() -> None:
+def test_python_bot_example_protocol_v2_smoke_fixture() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    fixture_path = repo_root / "bot_template" / "fixtures" / "sample_v2_state.json"
+    fixture_path = repo_root / "bot" / "fixtures" / "sample_v2_state.json"
     state = json.loads(fixture_path.read_text(encoding="utf-8"))
 
-    bot_dir = repo_root / "bot_template"
+    bot_dir = repo_root / "bot" / "examples" / "python_bot"
     response = subprocess.run(
         [sys.executable, "bot.py"],
         cwd=bot_dir,
@@ -37,9 +37,10 @@ def test_bot_template_protocol_v2_smoke_fixture() -> None:
 
 def test_multilanguage_example_manifests_exist() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    examples_root = repo_root / "bot_template" / "examples"
+    examples_root = repo_root / "bot" / "examples"
 
     manifests = {
+        "python_bot": {"command": ["python", "bot.py"], "protocol_version": "2.0"},
         "javascript_bot": {"command": ["node", "bot.js"], "protocol_version": "2.0"},
         "cpp_bot": {"command": ["./bot"], "protocol_version": "2.0"},
         "go_bot": {"command": ["./bot"], "protocol_version": "2.0"},

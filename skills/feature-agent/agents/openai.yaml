@@ -1,4 +1,0 @@
-interface:
-  display_name: "Feature Agent"
-  short_description: "Implements a scoped feature with tests"
-  default_prompt: "Use -agent to implement a scoped feature."

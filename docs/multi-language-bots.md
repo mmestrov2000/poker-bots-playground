@@ -61,7 +61,7 @@ The platform preserves executable permissions from the uploaded archive, so bund
 
 ## JavaScript Example
 
-Folder: [`bot_template/examples/javascript_bot/`](../bot_template/examples/javascript_bot/)
+Folder: [`bot/examples/javascript_bot/`](../bot/examples/javascript_bot/)
 
 `bot.json`:
 
@@ -107,7 +107,7 @@ Important:
 
 ## C++ Example
 
-Folder: [`bot_template/examples/cpp_bot/`](../bot_template/examples/cpp_bot/)
+Folder: [`bot/examples/cpp_bot/`](../bot/examples/cpp_bot/)
 
 `bot.json`:
 
@@ -137,7 +137,7 @@ Important:
 
 ## Go Example
 
-Folder: [`bot_template/examples/go_bot/`](../bot_template/examples/go_bot/)
+Folder: [`bot/examples/go_bot/`](../bot/examples/go_bot/)
 
 `bot.json`:
 
@@ -176,7 +176,7 @@ If the runtime can execute your command, the platform does not care which langua
 No matter the language, the local test is the same idea:
 
 ```bash
-<your command> < bot_template/fixtures/sample_v2_state.json
+<your command> < bot/fixtures/sample_v2_state.json
 ```
 
 Examples:

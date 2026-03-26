@@ -23,7 +23,7 @@ If you want another language, the main rule is simple: the command in `bot.json`
 
 ## Step 1: Copy the Starter Folder
 
-Start from [`bot_template/`](../bot_template/).
+Start from [`bot/examples/python_bot/`](../bot/examples/python_bot/).
 
 Minimum files:
 
@@ -131,28 +131,26 @@ Here are common things bots check:
 - Opponent aggression from `action_history`
 - Stack pressure from `hero["stack"]`, `players`, and blind levels
 
-The starter bot in [`bot_template/bot.py`](../bot_template/bot.py) already shows one useful pattern: counting opponent aggressive actions from `action_history`.
+The starter bot in [`bot/examples/python_bot/bot.py`](../bot/examples/python_bot/bot.py) already shows one useful pattern: counting opponent aggressive actions from `action_history`.
 
 Readable examples are here:
-- [`bot_template/examples/random_bot/bot.py`](../bot_template/examples/random_bot/bot.py)
-- [`bot_template/examples/aggressive_bot/bot.py`](../bot_template/examples/aggressive_bot/bot.py)
-- [`bot_template/examples/conservative_bot/bot.py`](../bot_template/examples/conservative_bot/bot.py)
-- [`bot_template/examples/javascript_bot/bot.js`](../bot_template/examples/javascript_bot/bot.js)
-- [`bot_template/examples/cpp_bot/bot.cpp`](../bot_template/examples/cpp_bot/bot.cpp)
-- [`bot_template/examples/go_bot/bot.go`](../bot_template/examples/go_bot/bot.go)
+- [`bot/examples/python_bot/bot.py`](../bot/examples/python_bot/bot.py)
+- [`bot/examples/javascript_bot/bot.js`](../bot/examples/javascript_bot/bot.js)
+- [`bot/examples/cpp_bot/bot.cpp`](../bot/examples/cpp_bot/bot.cpp)
+- [`bot/examples/go_bot/bot.go`](../bot/examples/go_bot/bot.go)
 
 ## Step 6: Test Your Bot Locally
 
 From the repo root:
 
 ```bash
-python bot_template/bot.py < bot_template/fixtures/sample_v2_state.json
+python bot/examples/python_bot/bot.py < bot/fixtures/sample_v2_state.json
 ```
 
 If you copied the template into `my_bot/`, test your own bot the same way:
 
 ```bash
-python my_bot/bot.py < bot_template/fixtures/sample_v2_state.json
+python my_bot/bot.py < bot/fixtures/sample_v2_state.json
 ```
 
 You should see one JSON action printed to the terminal.
@@ -221,7 +219,7 @@ Keep your bot simple, fast, and deterministic enough to respond comfortably with
 
 If you are participating in the event and want the fastest path:
 
-1. Copy `bot_template/`
+1. Copy `bot/examples/python_bot/`
 2. Edit only `bot.py`
 3. Keep `bot.json` unchanged
 4. Test with `sample_v2_state.json`

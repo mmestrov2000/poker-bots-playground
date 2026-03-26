@@ -1,8 +1,7 @@
 const path = require("path");
 const { test, expect } = require("@playwright/test");
 
-const randomBotZip = path.join(__dirname, "..", "bot_template", "bots", "random_bot.zip");
-const aggressiveBotZip = path.join(__dirname, "..", "bot_template", "bots", "aggressive_bot.zip");
+const pythonBotZip = path.join(__dirname, "fixtures", "python_bot.zip");
 
 function buildUsername(testInfo) {
   const slug = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
@@ -66,7 +65,7 @@ test("auth flow works across responsive breakpoints", async ({ page }, testInfo)
 test("lobby and my bots stay usable across breakpoints", async ({ page }, testInfo) => {
   const username = buildUsername(testInfo);
   await registerAndLandInLobby(page, username);
-  await uploadBot(page, "Responsive Random", "1.0.0", randomBotZip);
+  await uploadBot(page, "Responsive Python", "1.0.0", pythonBotZip);
   await createTable(page);
 
   if (testInfo.project.name === "chromium-mobile") {
@@ -84,8 +83,8 @@ test("desktop and tablet can seat bots, run a match, and inspect history", async
 
   const username = buildUsername(testInfo);
   await registerAndLandInLobby(page, username);
-  await uploadBot(page, "Arena Random", "1.0.0", randomBotZip);
-  await uploadBot(page, "Arena Aggro", "2.0.0", aggressiveBotZip);
+  await uploadBot(page, "Arena Python A", "1.0.0", pythonBotZip);
+  await uploadBot(page, "Arena Python B", "2.0.0", pythonBotZip);
   await createTable(page);
 
   await seatBot(page, 1, 0);

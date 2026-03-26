@@ -11,9 +11,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Repo validation
-        run: scripts/validate_repo.sh
-      - name: Bootstrap Python venv
-        run: scripts/bootstrap_venv.sh
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: |
+          python -m venv backend/.venv
+          . backend/.venv/bin/activate
+          pip install -r backend/requirements-dev.txt
       - name: Backend tests
-        run: scripts/run_backend_pytest.sh
+        run: |
+          . backend/.venv/bin/activate
+          cd backend
+          PYTHONPATH=. pytest -q

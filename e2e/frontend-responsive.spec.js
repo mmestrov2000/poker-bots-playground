@@ -21,12 +21,15 @@ async function registerAndLandInLobby(page, username) {
 
 async function uploadBot(page, name, version, zipPath) {
   await page.goto("/my-bots");
+  await page.getByTestId("my-bots-open-upload").click();
+  await expect(page.locator("#my-bots-upload-modal")).toBeVisible();
   await expect(page.getByTestId("my-bots-upload-form")).toBeVisible();
   await page.locator("#bot-name").fill(name);
   await page.locator("#bot-version").fill(version);
   await page.locator("#bot-file").setInputFiles(zipPath);
   await page.getByTestId("my-bots-upload-submit").click();
-  await expect(page.locator("#my-bots-upload-feedback")).toHaveText(`Upload successful: ${name}`);
+  await expect(page.locator("#my-bots-upload-modal")).toHaveClass(/hidden/);
+  await expect(page.locator("[data-testid^='bot-row-']").first()).toContainText(name);
 }
 
 async function createTable(page, smallBlind = "0.5", bigBlind = "1") {

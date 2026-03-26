@@ -21,56 +21,78 @@
         </nav>
       </header>
 
-      <section class="page-intro page-hero">
+      <section class="page-intro page-hero page-hero-single">
         <div>
           <p class="panel-eyebrow">Bot Catalog</p>
-          <h2>Upload once, seat anywhere.</h2>
+          <h2>Keep your bot list clean and quick to manage.</h2>
           <p class="page-intro-copy">
-            The upload flow stays close to the catalog, statuses stay readable, and the page avoids the oversized empty panels that slow down quick management.
+            Ready bots stay in one clear table, while adding a new bot happens in a focused popup that brings you right back to the list when you are done.
           </p>
         </div>
-        <div class="page-intro-metrics">
-          <p id="auth-user" class="auth-user metric-pill"></p>
-          <p class="metric-pill">Private bot storage</p>
-          <p class="metric-pill">Seat from catalog</p>
+      </section>
+
+      <section class="my-bots-panel section-shell" aria-labelledby="my-bots-catalog-title">
+        <div class="panel-header">
+          <div>
+            <p class="panel-eyebrow">Catalog</p>
+            <h2 id="my-bots-catalog-title">Ready Bots</h2>
+          </div>
+          <button id="my-bots-open-upload" type="button" class="button-secondary" data-testid="my-bots-open-upload">
+            Add New Bot
+          </button>
+        </div>
+        <p id="my-bots-state" class="my-bots-state" role="status">Loading bots...</p>
+        <div id="my-bots-table-shell" class="my-bots-table-shell hidden">
+          <table id="my-bots-table" class="my-bots-table" data-testid="my-bots-table">
+            <thead>
+              <tr>
+                <th>Bot</th>
+                <th>Version</th>
+                <th>Status</th>
+                <th>Added</th>
+                <th>Bot ID</th>
+              </tr>
+            </thead>
+            <tbody id="my-bots-body"></tbody>
+          </table>
         </div>
       </section>
-
-      <section class="my-bots-grid">
-        <section class="my-bots-panel section-shell" aria-labelledby="my-bots-upload-title">
-          <div class="panel-header">
-            <div>
-              <p class="panel-eyebrow">Upload</p>
-              <h2 id="my-bots-upload-title">Add New Bot</h2>
-            </div>
-          </div>
-          <form id="my-bots-upload-form" class="my-bots-upload-form" data-testid="my-bots-upload-form">
-            <label class="field-label" for="bot-name">Bot Name</label>
-            <input id="bot-name" name="name" type="text" maxlength="120" required />
-
-            <label class="field-label" for="bot-version">Version</label>
-            <input id="bot-version" name="version" type="text" maxlength="64" required />
-
-            <label class="field-label" for="bot-file">Bot Package (.zip)</label>
-            <input id="bot-file" name="bot_file" type="file" accept=".zip" required />
-
-            <button id="my-bots-upload-submit" type="submit" data-testid="my-bots-upload-submit">Upload Bot</button>
-          </form>
-          <p id="my-bots-upload-feedback" class="my-bots-upload-feedback hidden" role="status"></p>
-        </section>
-
-        <section class="my-bots-panel section-shell" aria-labelledby="my-bots-catalog-title">
-          <div class="panel-header">
-            <div>
-              <p class="panel-eyebrow">Catalog</p>
-              <h2 id="my-bots-catalog-title">Ready Bots</h2>
-            </div>
-          </div>
-          <p id="my-bots-state" class="my-bots-state" role="status">Loading bots...</p>
-          <ul id="my-bots-list" class="my-bots-list hidden" data-testid="my-bots-list"></ul>
-        </section>
-      </section>
     </main>
+
+    <div id="my-bots-upload-modal" class="my-bots-upload-modal seat-assignment-modal hidden" aria-hidden="true">
+      <section
+        class="my-bots-upload-dialog seat-assignment surface-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="my-bots-upload-title"
+        aria-describedby="my-bots-upload-subtitle"
+      >
+        <div class="my-bots-upload-header seat-assignment-header">
+          <div>
+            <p class="panel-eyebrow">Upload</p>
+            <h3 id="my-bots-upload-title">Add New Bot</h3>
+            <p id="my-bots-upload-subtitle" class="seat-assignment-subtitle">
+              Upload a `.zip` bot package and it will appear at the top of Ready Bots.
+            </p>
+          </div>
+          <button id="my-bots-upload-close" type="button" class="button-ghost">Close</button>
+        </div>
+
+        <form id="my-bots-upload-form" class="my-bots-upload-form" data-testid="my-bots-upload-form">
+          <label class="field-label" for="bot-name">Bot Name</label>
+          <input id="bot-name" name="name" type="text" maxlength="120" required />
+
+          <label class="field-label" for="bot-version">Version</label>
+          <input id="bot-version" name="version" type="text" maxlength="64" required />
+
+          <label class="field-label" for="bot-file">Bot Package (.zip)</label>
+          <input id="bot-file" name="bot_file" type="file" accept=".zip" required />
+
+          <button id="my-bots-upload-submit" type="submit" data-testid="my-bots-upload-submit">Upload Bot</button>
+        </form>
+        <p id="my-bots-upload-feedback" class="my-bots-upload-feedback hidden" role="status"></p>
+      </section>
+    </div>
 
     <script src="/static/app-shell.js?v=__ASSET_VERSION__" defer></script>
     <script src="/static/my-bots.js?v=__ASSET_VERSION__" defer></script>

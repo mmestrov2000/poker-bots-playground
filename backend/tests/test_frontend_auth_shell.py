@@ -199,7 +199,8 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'data-testid="seat-existing-bot-id"' in table_detail_html
     assert "/static/table-detail.js" in table_detail_html
 
-    assert 'id="my-bots-list"' in my_bots_html
+    assert 'id="my-bots-open-upload"' in my_bots_html
+    assert 'id="my-bots-upload-modal"' in my_bots_html
     assert 'id="my-bots-upload-form"' in my_bots_html
     assert 'id="bot-name"' in my_bots_html
     assert 'id="bot-version"' in my_bots_html
@@ -207,7 +208,9 @@ def test_frontend_pages_split_login_lobby_and_my_bots():
     assert 'id="my-bots-upload-submit"' in my_bots_html
     assert 'id="my-bots-upload-feedback"' in my_bots_html
     assert 'id="my-bots-state"' in my_bots_html
-    assert 'data-testid="my-bots-list"' in my_bots_html
+    assert 'id="my-bots-table"' in my_bots_html
+    assert 'id="my-bots-body"' in my_bots_html
+    assert 'data-testid="my-bots-table"' in my_bots_html
     assert "/static/my-bots.js" in my_bots_html
 
 
@@ -309,9 +312,14 @@ def test_frontend_my_bots_script_smoke_for_page_load_upload_and_states():
     # Upload success flow and post-upload reconciliation.
     assert 'window.AppShell.request("/my/bots", {' in my_bots_js
     assert 'method: "POST"' in my_bots_js
+    assert 'document.getElementById("my-bots-open-upload")' in my_bots_js
+    assert 'document.getElementById("my-bots-upload-modal")' in my_bots_js
+    assert "function openUploadModal()" in my_bots_js
+    assert "function closeUploadModal(options = {})" in my_bots_js
     assert "Upload successful" in my_bots_js
     assert "await loadBots()" in my_bots_js
     assert 'window.AppShell.notify(`Upload successful: ${uploadedName}`' in my_bots_js
+    assert "normalizeBotsForDisplay" in my_bots_js
 
     # Error handling and explicit loading/empty/error states.
     assert "Loading bots..." in my_bots_js
@@ -419,7 +427,8 @@ def test_frontend_my_bots_page_loads_for_authenticated_user():
     page = get_page_endpoint("/my-bots")(page_request)
     assert page.status_code == 200
     body = page.body.decode("utf-8")
-    assert 'id="my-bots-list"' in body
+    assert 'id="my-bots-open-upload"' in body
+    assert 'id="my-bots-table"' in body
     assert 'id="my-bots-upload-form"' in body
 
 

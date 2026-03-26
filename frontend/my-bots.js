@@ -1,11 +1,16 @@
 (() => {
+  const myBotsOpenUploadButton = document.getElementById("my-bots-open-upload");
+  const myBotsUploadModal = document.getElementById("my-bots-upload-modal");
+  const myBotsUploadCloseButton = document.getElementById("my-bots-upload-close");
   const myBotsUploadForm = document.getElementById("my-bots-upload-form");
   const myBotsUploadSubmit = document.getElementById("my-bots-upload-submit");
   const myBotsUploadFeedback = document.getElementById("my-bots-upload-feedback");
   const myBotsState = document.getElementById("my-bots-state");
-  const myBotsList = document.getElementById("my-bots-list");
+  const myBotsTableShell = document.getElementById("my-bots-table-shell");
+  const myBotsBody = document.getElementById("my-bots-body");
 
   let botsSignature = "";
+  let lastFocusedElement = null;
 
   function formatTimestamp(value) {
     if (!value) {
@@ -40,9 +45,30 @@
   function setListState(type, message) {
     myBotsState.textContent = message;
     myBotsState.classList.remove("hidden");
-    myBotsList.classList.add("hidden");
+    myBotsTableShell?.classList.add("hidden");
     myBotsState.classList.remove("is-loading", "is-empty", "is-error");
     myBotsState.classList.add(`is-${type}`);
+  }
+
+  function getBotTimestamp(bot) {
+    const candidates = [bot.uploaded_at, bot.created_at];
+    for (const value of candidates) {
+      const timestamp = Date.parse(value || "");
+      if (Number.isFinite(timestamp)) {
+        return timestamp;
+      }
+    }
+    return 0;
+  }
+
+  function normalizeBotsForDisplay(bots) {
+    return [...bots].sort((left, right) => {
+      const timestampDelta = getBotTimestamp(right) - getBotTimestamp(left);
+      if (timestampDelta !== 0) {
+        return timestampDelta;
+      }
+      return String(right.bot_id || "").localeCompare(String(left.bot_id || ""));
+    });
   }
 
   function buildBotsSignature(bots) {
@@ -51,74 +77,163 @@
       .join("||");
   }
 
-  function createMetadataRow(label, value) {
-    const row = document.createElement("p");
-    row.className = "my-bot-meta-row";
-    const labelElement = document.createElement("strong");
-    labelElement.textContent = `${label}: `;
-    const valueElement = document.createElement("span");
-    valueElement.textContent = value;
-    row.append(labelElement, valueElement);
-    return row;
+  function createCell(text, className = "") {
+    const cell = document.createElement("td");
+    if (className) {
+      cell.className = className;
+    }
+    cell.textContent = text;
+    return cell;
   }
 
-  function renderMyBotsList(bots) {
-    const nextSignature = buildBotsSignature(bots);
+  function createStatusCell(status) {
+    const cell = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = "bot-status-pill";
+    badge.textContent = status || "ready";
+    cell.appendChild(badge);
+    return cell;
+  }
+
+  function createPrimaryCell(bot) {
+    const cell = document.createElement("td");
+    cell.className = "my-bot-primary-cell";
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "my-bot-primary";
+
+    const title = document.createElement("strong");
+    title.textContent = bot.name || "Unnamed Bot";
+
+    const meta = document.createElement("span");
+    meta.textContent = `Uploaded ${formatTimestamp(bot.uploaded_at || bot.created_at)}`;
+
+    wrapper.append(title, meta);
+    cell.appendChild(wrapper);
+    return cell;
+  }
+
+  function renderMyBotsTable(bots) {
+    const sortedBots = normalizeBotsForDisplay(bots);
+    const nextSignature = buildBotsSignature(sortedBots);
     if (nextSignature === botsSignature) {
-      myBotsState.classList.toggle("hidden", Boolean(bots.length));
-      myBotsList.classList.toggle("hidden", !bots.length);
+      myBotsState.classList.toggle("hidden", Boolean(sortedBots.length));
+      myBotsTableShell?.classList.toggle("hidden", !sortedBots.length);
       return;
     }
     botsSignature = nextSignature;
-    myBotsList.innerHTML = "";
+    if (myBotsBody) {
+      myBotsBody.innerHTML = "";
+    }
 
-    if (!bots.length) {
+    if (!sortedBots.length) {
       setListState("empty", "No bots uploaded yet. Upload your first bot to get started.");
       return;
     }
 
-    bots.forEach((bot) => {
-      const item = document.createElement("li");
-      item.className = "my-bot-card";
-      item.dataset.testid = `bot-card-${bot.bot_id}`;
-
-      const header = document.createElement("div");
-      header.className = "my-bot-card-header";
-      const title = document.createElement("h3");
-      title.textContent = bot.name || "Unnamed Bot";
-      const badge = document.createElement("span");
-      badge.className = "bot-status-pill";
-      badge.textContent = bot.status || "ready";
-      header.append(title, badge);
-
-      item.append(
-        header,
-        createMetadataRow("Bot ID", bot.bot_id || "-"),
-        createMetadataRow("Version", bot.version || "-"),
-        createMetadataRow("Status", bot.status || "-"),
-        createMetadataRow("Created", formatTimestamp(bot.created_at)),
-        createMetadataRow("Uploaded", formatTimestamp(bot.uploaded_at || bot.created_at))
+    sortedBots.forEach((bot) => {
+      if (!myBotsBody) {
+        return;
+      }
+      const row = document.createElement("tr");
+      row.dataset.testid = `bot-row-${bot.bot_id}`;
+      row.append(
+        createPrimaryCell(bot),
+        createCell(bot.version || "-", "my-bot-version-cell"),
+        createStatusCell(bot.status || "ready"),
+        createCell(formatTimestamp(bot.created_at), "my-bot-date-cell"),
+        createCell(bot.bot_id || "-", "table-id")
       );
-      myBotsList.appendChild(item);
+      myBotsBody.appendChild(row);
     });
 
     myBotsState.classList.add("hidden");
-    myBotsList.classList.remove("hidden");
+    myBotsTableShell?.classList.remove("hidden");
   }
 
-  async function loadBots() {
-    setListState("loading", "Loading bots...");
+  async function loadBots(options = {}) {
+    const { showLoading = false } = options;
+    if (showLoading || !botsSignature) {
+      setListState("loading", "Loading bots...");
+    }
     const response = await window.AppShell.request("/my/bots");
-    renderMyBotsList(response.bots || []);
+    renderMyBotsTable(response.bots || []);
   }
 
   function setUploadBusy(isBusy) {
-    if (!myBotsUploadSubmit) {
+    if (!myBotsUploadSubmit || !myBotsUploadForm) {
       return;
     }
     myBotsUploadSubmit.disabled = isBusy;
     myBotsUploadSubmit.textContent = isBusy ? "Uploading..." : "Upload Bot";
-    myBotsUploadForm?.setAttribute("aria-busy", isBusy ? "true" : "false");
+    myBotsOpenUploadButton?.toggleAttribute("disabled", isBusy);
+    myBotsUploadCloseButton?.toggleAttribute("disabled", isBusy);
+    myBotsUploadForm.setAttribute("aria-busy", isBusy ? "true" : "false");
+  }
+
+  function getModalFocusables() {
+    if (!myBotsUploadModal) {
+      return [];
+    }
+    return [...myBotsUploadModal.querySelectorAll("button, input, select, textarea, [href], [tabindex]:not([tabindex='-1'])")]
+      .filter((element) => !element.disabled);
+  }
+
+  function openUploadModal() {
+    if (!myBotsUploadModal) {
+      return;
+    }
+    lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    clearUploadFeedback();
+    myBotsUploadModal.classList.remove("hidden");
+    myBotsUploadModal.setAttribute("aria-hidden", "false");
+    window.setTimeout(() => {
+      document.getElementById("bot-name")?.focus();
+    }, 0);
+  }
+
+  function closeUploadModal(options = {}) {
+    const { resetForm = false } = options;
+    if (!myBotsUploadModal) {
+      return;
+    }
+    if (resetForm) {
+      myBotsUploadForm?.reset();
+    }
+    clearUploadFeedback();
+    myBotsUploadModal.classList.add("hidden");
+    myBotsUploadModal.setAttribute("aria-hidden", "true");
+    if (lastFocusedElement instanceof HTMLElement) {
+      lastFocusedElement.focus();
+    }
+  }
+
+  function handleModalKeydown(event) {
+    if (!myBotsUploadModal || myBotsUploadModal.classList.contains("hidden")) {
+      return;
+    }
+    if (event.key === "Escape" && !myBotsUploadSubmit?.disabled) {
+      closeUploadModal();
+      return;
+    }
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    const focusables = getModalFocusables();
+    if (!focusables.length) {
+      return;
+    }
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   async function handleUploadSubmit(event) {
@@ -147,10 +262,9 @@
         body: formData,
       });
       const uploadedName = response?.bot?.name || "bot";
-      setUploadFeedback(`Upload successful: ${uploadedName}`, "success");
       window.AppShell.notify(`Upload successful: ${uploadedName}`, "success");
-      myBotsUploadForm.reset();
       await loadBots();
+      closeUploadModal({ resetForm: true });
     } catch (error) {
       if (error.statusCode === 401) {
         window.location.assign("/login");
@@ -171,6 +285,14 @@
 
     window.AppShell.initHeader("my-bots", user);
     clearUploadFeedback();
+    myBotsOpenUploadButton?.addEventListener("click", openUploadModal);
+    myBotsUploadCloseButton?.addEventListener("click", () => closeUploadModal({ resetForm: true }));
+    myBotsUploadModal?.addEventListener("click", (event) => {
+      if (event.target === myBotsUploadModal && !myBotsUploadSubmit?.disabled) {
+        closeUploadModal({ resetForm: true });
+      }
+    });
+    document.addEventListener("keydown", handleModalKeydown);
     myBotsUploadForm?.addEventListener("submit", (event) => {
       handleUploadSubmit(event).catch((error) => {
         console.error(error);
@@ -179,7 +301,7 @@
     });
 
     try {
-      await loadBots();
+      await loadBots({ showLoading: true });
     } catch (error) {
       if (error.statusCode === 401) {
         window.location.assign("/login");

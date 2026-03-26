@@ -1,7 +1,7 @@
 const path = require("path");
 const { test, expect } = require("@playwright/test");
 
-const randomBotZip = path.join(__dirname, "..", "bot_template", "bots", "random_bot.py.zip");
+const randomBotZip = path.join(__dirname, "..", "bot_template", "bots", "random_bot.zip");
 const aggressiveBotZip = path.join(__dirname, "..", "bot_template", "bots", "aggressive_bot.zip");
 
 function buildUsername(testInfo) {

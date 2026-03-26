@@ -1,5 +1,5 @@
-import zipfile
 import json
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
@@ -13,13 +13,6 @@ from app.storage.hand_store import HandStore
 def _write_bot_zip(tmp_path: Path, name: str, body: str) -> Path:
     zip_path = tmp_path / name
     with zipfile.ZipFile(zip_path, "w") as archive:
-        archive.writestr("bot.py", body)
-    return zip_path
-
-
-def _write_stdio_bot_zip(tmp_path: Path, name: str, body: str) -> Path:
-    zip_path = tmp_path / name
-    with zipfile.ZipFile(zip_path, "w") as archive:
         archive.writestr("bot.json", json.dumps({"command": ["python", "bot.py"], "protocol_version": "2.0"}))
         archive.writestr("bot.py", body)
     return zip_path
@@ -31,13 +24,11 @@ def test_registering_both_seats_starts_match(tmp_path: Path) -> None:
 
     bot_body = "\n".join(
         [
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        if 'check' in state.get('legal_actions', []):",
-            "            return {'action': 'check'}",
-            "        if 'call' in state.get('legal_actions', []):",
-            "            return {'action': 'call'}",
-            "        return {'action': 'fold'}",
+            "import json",
+            "import sys",
+            "state = json.load(sys.stdin)",
+            "legal = {entry['action'] for entry in state['legal_actions']}",
+            "json.dump({'action': 'check' if 'check' in legal else 'call' if 'call' in legal else 'fold'}, sys.stdout)",
         ]
     )
     bot_a = _write_bot_zip(tmp_path, "alpha.zip", bot_body)
@@ -59,7 +50,9 @@ def test_registering_both_seats_starts_match(tmp_path: Path) -> None:
 
     latest_hand = service.get_hand(hands[0]["hand_id"])
     assert latest_hand is not None
-    assert "Winner: Seat" in (latest_hand["history"] or "")
+    history = latest_hand["history"] or ""
+    assert "*** SUMMARY ***" in history
+    assert "Seat " in history
 
     service.pause_match()
     assert service.get_match()["status"] == "paused"
@@ -80,13 +73,11 @@ def test_reset_match_clears_state(tmp_path: Path) -> None:
 
     bot_body = "\n".join(
         [
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        if 'check' in state.get('legal_actions', []):",
-            "            return {'action': 'check'}",
-            "        if 'call' in state.get('legal_actions', []):",
-            "            return {'action': 'call'}",
-            "        return {'action': 'fold'}",
+            "import json",
+            "import sys",
+            "state = json.load(sys.stdin)",
+            "legal = {entry['action'] for entry in state['legal_actions']}",
+            "json.dump({'action': 'check' if 'check' in legal else 'call' if 'call' in legal else 'fold'}, sys.stdout)",
         ]
     )
     bot_a = _write_bot_zip(tmp_path, "alpha.zip", bot_body)
@@ -120,8 +111,8 @@ def test_registering_stdio_bots_plays_hands(tmp_path: Path) -> None:
             "json.dump({'action': 'check' if 'check' in legal else 'call' if 'call' in legal else 'fold'}, sys.stdout)",
         ]
     )
-    bot_a = _write_stdio_bot_zip(tmp_path, "alpha-stdio.zip", bot_body)
-    bot_b = _write_stdio_bot_zip(tmp_path, "beta-stdio.zip", bot_body)
+    bot_a = _write_bot_zip(tmp_path, "alpha-stdio.zip", bot_body)
+    bot_b = _write_bot_zip(tmp_path, "beta-stdio.zip", bot_body)
 
     service.register_bot("1", "alpha-stdio.zip", bot_path=bot_a)
     service.register_bot("2", "beta-stdio.zip", bot_path=bot_b)
@@ -295,25 +286,28 @@ def test_list_pnl_returns_deltas_and_last_hand_id(tmp_path: Path) -> None:
     [
         "\n".join(
             [
-                "class PokerBot:",
-                "    def act(self, state):",
-                "        raise SystemExit(2)",
+                "import json",
+                "import sys",
+                "json.load(sys.stdin)",
+                "raise SystemExit(2)",
             ]
         ),
         "\n".join(
             [
+                "import json",
+                "import sys",
                 "import time",
-                "class PokerBot:",
-                "    def act(self, state):",
-                "        time.sleep(10)",
-                "        return {'action': 'check'}",
+                "json.load(sys.stdin)",
+                "time.sleep(10)",
+                "json.dump({'action': 'check'}, sys.stdout)",
             ]
         ),
         "\n".join(
             [
-                "class PokerBot:",
-                "    def act(self, state):",
-                "        return 'not-a-dict'",
+                "import json",
+                "import sys",
+                "json.load(sys.stdin)",
+                "sys.stdout.write('not-a-dict')",
             ]
         ),
     ],
@@ -324,13 +318,11 @@ def test_runtime_supervisor_contains_bad_bots(tmp_path: Path, bot_body: str) -> 
 
     stable_bot = "\n".join(
         [
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        if 'check' in state.get('legal_actions', []):",
-            "            return {'action': 'check'}",
-            "        if 'call' in state.get('legal_actions', []):",
-            "            return {'action': 'call'}",
-            "        return {'action': 'fold'}",
+            "import json",
+            "import sys",
+            "state = json.load(sys.stdin)",
+            "legal = {entry['action'] for entry in state['legal_actions']}",
+            "json.dump({'action': 'check' if 'check' in legal else 'call' if 'call' in legal else 'fold'}, sys.stdout)",
         ]
     )
     bot_a = _write_bot_zip(tmp_path, "stable.zip", stable_bot)
@@ -370,9 +362,10 @@ def test_match_loop_runtime_error_stops_match_safely(tmp_path: Path) -> None:
 
     bot_body = "\n".join(
         [
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        return {'action': 'check'}",
+            "import json",
+            "import sys",
+            "json.load(sys.stdin)",
+            "json.dump({'action': 'check'}, sys.stdout)",
         ]
     )
     bot_a = _write_bot_zip(tmp_path, "alpha.zip", bot_body)

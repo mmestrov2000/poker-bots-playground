@@ -1,4 +1,5 @@
 import io
+import json
 import math
 import stat
 import time
@@ -36,6 +37,26 @@ def build_zip(files: dict[str, str]) -> bytes:
         for name, content in files.items():
             archive.writestr(name, content)
     return buffer.getvalue()
+
+
+def build_stdio_zip(
+    script: str,
+    *,
+    command: list[str] | None = None,
+    manifest_path: str = "bot.json",
+    script_path: str = "bot.py",
+) -> bytes:
+    return build_zip(
+        {
+            manifest_path: json.dumps(
+                {
+                    "command": command or ["python", "bot.py"],
+                    "protocol_version": "2.0",
+                }
+            ),
+            script_path: script,
+        }
+    )
 
 
 def build_upload_file(filename: str, payload: bytes) -> FakeUploadFile:
@@ -133,7 +154,7 @@ def extract_cookie_morsel(response: Response):
 
 @pytest.mark.anyio
 async def test_upload_rejects_invalid_seat():
-    payload = build_zip({"bot.py": "class PokerBot: pass"})
+    payload = build_stdio_zip("print('hello')\n")
     with pytest.raises(HTTPException) as exc_info:
         await routes.upload_bot("7", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
@@ -171,19 +192,21 @@ async def test_upload_rejects_missing_bot_file():
     with pytest.raises(HTTPException) as exc_info:
         await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "bot.py must exist at zip root or one top-level folder"
+    assert exc_info.value.detail == "bot.json must exist at zip root or one top-level folder"
 
 
 @pytest.mark.anyio
 async def test_upload_accepts_bot_file_in_single_top_level_folder():
-    payload = build_zip(
-        {
-            "my_bot/bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
 """,
-        }
+        manifest_path="my_bot/bot.json",
+        script_path="my_bot/bot.py",
     )
 
     response = await routes.upload_bot("1", build_upload_file("nested.zip", payload))
@@ -193,10 +216,8 @@ class PokerBot:
 
 @pytest.mark.anyio
 async def test_upload_accepts_stdio_manifest_bot():
-    payload = build_zip(
-        {
-            "bot.json": '{"command":["python","bot.py"],"protocol_version":"2.0"}',
-            "bot.py": """
+    payload = build_stdio_zip(
+        """
 import json
 import sys
 
@@ -204,7 +225,6 @@ state = json.load(sys.stdin)
 legal = {entry["action"] for entry in state["legal_actions"]}
 json.dump({"action": "check" if "check" in legal else "fold"}, sys.stdout)
 """,
-        }
     )
 
     response = await routes.upload_bot("1", build_upload_file("stdio.zip", payload))
@@ -222,7 +242,7 @@ async def test_upload_rejects_invalid_zip_archive():
 
 @pytest.mark.anyio
 async def test_upload_rejects_unsafe_archive_paths():
-    payload = build_zip({"../bot.py": "class PokerBot: pass"})
+    payload = build_zip({"../bot.json": '{"command":["python","bot.py"],"protocol_version":"2.0"}'})
     with pytest.raises(HTTPException) as exc_info:
         await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
@@ -233,14 +253,14 @@ async def test_upload_rejects_unsafe_archive_paths():
 async def test_upload_rejects_archives_with_multiple_bot_candidates():
     payload = build_zip(
         {
-            "bot_a/bot.py": "class PokerBot: pass",
-            "bot_b/bot.py": "class PokerBot: pass",
+            "bot_a/bot.json": '{"command":["python","bot.py"],"protocol_version":"2.0"}',
+            "bot_b/bot.json": '{"command":["python","bot.py"],"protocol_version":"2.0"}',
         }
     )
     with pytest.raises(HTTPException) as exc_info:
         await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Archive contains multiple bot.py candidates"
+    assert exc_info.value.detail == "Archive contains multiple bot.json candidates"
 
 
 @pytest.mark.anyio
@@ -255,7 +275,8 @@ async def test_upload_rejects_stdio_manifest_with_missing_command_target():
 @pytest.mark.anyio
 async def test_upload_rejects_archives_with_too_many_files():
     files = {f"file_{i}.txt": "x" for i in range(130)}
-    files["bot.py"] = "class PokerBot:\n    def act(self, state):\n        return {'action': 'check'}"
+    files["bot.json"] = '{"command":["python","bot.py"],"protocol_version":"2.0"}'
+    files["bot.py"] = "print('hello')\n"
     payload = build_zip(files)
     with pytest.raises(HTTPException) as exc_info:
         await routes.upload_bot("1", build_upload_file("bot.zip", payload))
@@ -264,34 +285,38 @@ async def test_upload_rejects_archives_with_too_many_files():
 
 
 @pytest.mark.anyio
-async def test_upload_rejects_large_bot_source_file():
-    big_source = "class PokerBot:\n    pass\n" + ("#" * (256 * 1024))
-    payload = build_zip({"bot.py": big_source})
+async def test_upload_rejects_invalid_manifest_json():
+    payload = build_zip({"bot.json": "{not-json}"})
     with pytest.raises(HTTPException) as exc_info:
         await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
-    assert "bot.py exceeds" in exc_info.value.detail
+    assert exc_info.value.detail == "bot.json must be valid JSON"
 
 
 @pytest.mark.anyio
-async def test_upload_rejects_missing_pokerbot_class():
-    payload = build_zip({"bot.py": "class NotBot: pass"})
+async def test_upload_rejects_unsupported_manifest_protocol():
+    payload = build_zip(
+        {
+            "bot.json": '{"command":["python","bot.py"],"protocol_version":"9.9"}',
+            "bot.py": "print('hello')\n",
+        }
+    )
     with pytest.raises(HTTPException) as exc_info:
         await routes.upload_bot("1", build_upload_file("bot.zip", payload))
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "bot.py must define a PokerBot class"
+    assert exc_info.value.detail == "Unsupported protocol version '9.9'. Supported declared versions: 2.0"
 
 
 @pytest.mark.anyio
 async def test_uploads_start_match_and_expose_hands():
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
 """
-        }
     )
 
     response_a = await routes.upload_bot("1", build_upload_file("alpha.zip", payload))
@@ -451,14 +476,14 @@ def test_auth_login_success_and_me_returns_user():
 @pytest.mark.anyio
 async def test_my_bots_upload_and_list_success_for_authenticated_user():
     current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
-""",
-        }
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
+"""
     )
 
     created = await routes.upload_my_bot(
@@ -568,14 +593,14 @@ def test_lobby_tables_support_multi_table_lifecycle_listing():
 @pytest.mark.anyio
 async def test_table_live_endpoints_are_isolated_per_table():
     current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
 """
-        }
     )
     alpha = await routes.upload_my_bot(
         current_user=current_user,
@@ -656,14 +681,14 @@ class PokerBot:
 async def test_my_bots_ownership_isolated_between_users():
     alice = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
     bob = routes.auth_service.ensure_user("bob", "correct-horse-battery-staple")
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
-""",
-        }
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
+"""
     )
 
     alice_bot = await routes.upload_my_bot(
@@ -707,7 +732,7 @@ async def test_my_bots_upload_rejects_invalid_payload():
     with pytest.raises(HTTPException) as empty_name:
         await routes.upload_my_bot(
             current_user=current_user,
-            bot_file=build_upload_file("bot.zip", build_zip({"bot.py": "class PokerBot: pass"})),
+            bot_file=build_upload_file("bot.zip", build_stdio_zip("print('hello')\n")),
             name="   ",
             version="1.0.0",
         )
@@ -728,14 +753,14 @@ async def test_my_bots_upload_rejects_invalid_payload():
 @pytest.mark.anyio
 async def test_seat_bot_select_supports_existing_owned_bot():
     current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
 """
-        }
     )
     created = await routes.upload_my_bot(
         current_user=current_user,
@@ -760,14 +785,14 @@ class PokerBot:
 async def test_seat_bot_select_requires_ownership_and_valid_payload():
     alice = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
     bob = routes.auth_service.ensure_user("bob", "correct-horse-battery-staple")
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
 """
-        }
     )
     created = await routes.upload_my_bot(
         current_user=bob,
@@ -810,14 +835,14 @@ class PokerBot:
 @pytest.mark.anyio
 async def test_lobby_leaderboard_updates_after_completed_hand():
     current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
 """
-        }
     )
     alpha = await routes.upload_my_bot(
         current_user=current_user,
@@ -862,14 +887,14 @@ class PokerBot:
 @pytest.mark.anyio
 async def test_lobby_leaderboard_is_sorted_by_bb_per_hand():
     current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
 """
-        }
     )
     alpha = await routes.upload_my_bot(
         current_user=current_user,
@@ -1051,14 +1076,14 @@ def test_auth_login_failure_returns_401():
 @pytest.mark.anyio
 async def test_inline_upload_and_seat_selection_do_not_auto_start_match():
     current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
 """
-        }
     )
     alpha = await routes.upload_my_bot(
         current_user=current_user,

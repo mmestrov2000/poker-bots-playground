@@ -1,96 +1,84 @@
 # Poker Bots Playground
 
-Web playground for 2-6 player No-Limit Texas Hold'em bot battles.
+Poker Bots Playground is a web platform for 2-6 player No-Limit Texas Hold'em bot battles. Users upload bots, seat them at a table, and run matches while the app tracks live hands, hand histories, P&L, and leaderboard results.
 
-## MVP Features
-- Six bot upload seats (`1`-`6`) in a web UI.
-- Match controls for start/pause/resume/end once at least two bots are seated.
-- Continuous hand simulation with random outcomes.
-- Append-only hand list with per-hand text history view.
-- Leaderboard sorted by BB/hand with P&L line toggles.
-- Containerized runtime for local development and VPS deployment.
+## Start Here
 
-## Project Docs
-- `PROJECT_SPEC.md`
-- `ARCHITECTURE.md`
-- `TASKS.md`
-- `docs/parallel_agents_worktrees.md`
+### If you are building a bot for the event
+- Read the step-by-step guide: [docs/build-a-poker-bot.md](docs/build-a-poker-bot.md)
+- Start from the starter package: [bot_template/](bot_template/)
+- Browse readable example bots: [bot_template/examples/](bot_template/examples/)
+- Use upload-ready sample archives: [bot_template/bots/](bot_template/bots/)
 
-## Agent Prompt Presets
-- `prompts/feature_agent_m1.md`
-- `prompts/feature_agent_m2.md`
-- `prompts/test_agent_mvp.md`
-- `prompts/review_agent_milestones.md`
-- `prompts/release_agent_mvp.md`
+### Bot contract in one minute
+- Your upload is a `.zip` file.
+- It must include a `bot.json` manifest and the files referenced by that manifest.
+- On every decision, the server runs your declared command once.
+- Your bot reads one state JSON object from `stdin`.
+- Your bot writes one action JSON object to `stdout`.
+- The current runtime guarantees Python `3.12`, so the recommended event path is `["python", "bot.py"]`.
 
-## Automated Agent Git Flow
-- Start worktree/branch: `scripts/agent_worktree_start.sh --agent <agent-name> --task <task-id> --base marin`
-- Push and create PR: `scripts/agent_worktree_finish.sh --base marin --title "<PR title>" --body "<PR summary>"`
-- Detailed runbook: `docs/parallel_agents_worktrees.md`
+Example `bot.json`:
 
-## Python Setup (Per Worktree)
-```bash
-scripts/bootstrap_venv.sh
-source backend/.venv/bin/activate
+```json
+{
+  "command": ["python", "bot.py"],
+  "protocol_version": "2.0"
+}
 ```
 
-## Backend Tests (Per Worktree)
-```bash
-scripts/run_backend_pytest.sh
-```
+## What the Platform Includes
+- Authenticated `My Bots`, `Lobby`, and per-table pages.
+- Six seats per table with start, pause, resume, end, and reset controls.
+- Live hand simulation with readable hand-history detail.
+- Persistent leaderboard metrics in `bb/hand`.
+- Sandboxed bot execution with per-decision time, memory, and payload limits.
 
-## Frontend E2E Tests
-Install the Node test dependency and Chromium once per worktree:
+## Repository Guide
+- [PROJECT_SPEC.md](PROJECT_SPEC.md): product requirements and bot protocol contract.
+- [ARCHITECTURE.md](ARCHITECTURE.md): system design, runtime flow, and storage model.
+- [TASKS.md](TASKS.md): milestone history and implementation checklist.
+- [docs/parallel_agents_worktrees.md](docs/parallel_agents_worktrees.md): contributor workflow for multi-agent git worktrees.
 
-```bash
-npm install
-npm run install:e2e:browser
-```
+## Run Locally
 
-Run the responsive browser suite against the FastAPI app:
-
-```bash
-npm run test:e2e
-```
-
-Notes:
-- The Playwright config starts `uvicorn` automatically by sourcing `backend/.venv/bin/activate`.
-- E2E runs use `.playwright-runtime/` via `APP_RUNTIME_DIR` so local browser tests do not share your normal `runtime/` data.
-
-## Local Run
-### Option 1: Docker Compose
+### Docker Compose
 ```bash
 docker compose up --build
 ```
 
 Open `http://localhost:8000`.
 
-Auth persistence:
-- Registered users are stored in `runtime/auth.sqlite3`.
-- `docker-compose.yml` mounts `./runtime` into the container, so accounts persist across app restarts.
-- For VPS deployments, keep `APP_RUNTIME_DIR` (or `APP_AUTH_DB_PATH`) on persistent disk across restarts/redeploys.
+Auth data is stored in `runtime/auth.sqlite3`. `docker-compose.yml` mounts `./runtime`, so users and uploads persist across restarts.
 
-### Asset Versioning (Production)
-Set `APP_ASSET_VERSION` per deployment (for example to a git SHA or release tag) so browsers load new JS/CSS after deploy:
-
+### Python Development
 ```bash
-APP_ASSET_VERSION=$(git rev-parse --short HEAD) docker compose up --build -d
-```
-
-### Option 2: Python (backend + static frontend)
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-dev.txt
-PYTHONPATH=. uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+scripts/bootstrap_venv.sh
+source backend/.venv/bin/activate
+PYTHONPATH=backend uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Open `http://localhost:8000`.
 
-## Bot Upload Contract
-Upload `.zip` with `bot.json` plus your bot script(s). The server runs the declared command, sends decision state JSON on stdin, and expects action JSON on stdout.
-See `bot_template/README.md`.
+## Test the Repo
 
-## Current State
-This repo contains MVP bootstrap scaffolding. Core NLHE rules and robust bot sandboxing are tracked in `TASKS.md`.
+### Backend
+```bash
+scripts/run_backend_pytest.sh
+```
+
+### Frontend E2E
+```bash
+npm install
+npm run install:e2e:browser
+npm run test:e2e
+```
+
+Notes:
+- Playwright starts `uvicorn` automatically.
+- E2E runs use `.playwright-runtime/` so they do not reuse your normal `runtime/` data.
+
+## Contributor Workflow
+- Start a dedicated agent worktree: `scripts/agent_worktree_start.sh --agent <agent-name> --task <task-id> --base marin`
+- Finish, push, and open the PR: `scripts/agent_worktree_finish.sh --base marin --title "<PR title>" --body "<PR summary>"`
+- Full runbook: [docs/parallel_agents_worktrees.md](docs/parallel_agents_worktrees.md)

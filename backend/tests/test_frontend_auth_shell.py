@@ -1,5 +1,6 @@
 from http.cookies import SimpleCookie
 import io
+import json
 from pathlib import Path
 import zipfile
 
@@ -122,6 +123,15 @@ def build_zip(files: dict[str, str]) -> bytes:
         for name, content in files.items():
             archive.writestr(name, content)
     return buffer.getvalue()
+
+
+def build_stdio_zip(script: str) -> bytes:
+    return build_zip(
+        {
+            "bot.json": json.dumps({"command": ["python", "bot.py"], "protocol_version": "2.0"}),
+            "bot.py": script,
+        }
+    )
 
 
 class FakeUploadFile:
@@ -435,14 +445,14 @@ def test_frontend_table_detail_page_loads_for_authenticated_user():
 
 @pytest.mark.anyio
 async def test_frontend_happy_path_upload_interaction():
-    payload = build_zip(
-        {
-            "bot.py": """
-class PokerBot:
-    def act(self, state):
-        return {"action": "check", "amount": 0}
+    payload = build_stdio_zip(
+        """
+import json
+import sys
+
+json.load(sys.stdin)
+json.dump({"action": "check"}, sys.stdout)
 """
-        }
     )
     current_user = routes.auth_service.ensure_user("alice", "correct-horse-battery-staple")
     upload = await routes.upload_my_bot(

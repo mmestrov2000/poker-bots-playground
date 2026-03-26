@@ -10,13 +10,13 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 - `API Layer (FastAPI routes)`: REST endpoints for upload, status, hand summaries, and hand detail.
 - `Match Service`: Starts/stops match loop and coordinates hand simulation.
 - `Poker Engine`: Handles Texas Hold'em hand progression and action resolution.
-- `Bot Runner`: Loads user bot contract and executes `act` calls with timeout/error handling.
+- `Bot Runner`: Validates uploaded bot manifests and executes one command per decision with timeout/error handling.
 - `Hand Store`: Persists hand summaries and hand history text to runtime files.
 
 ## Runtime Flow
 1. User uploads bot to Seat 1-6 (`POST /seats/{seat_id}/bot`).
 2. API validates package shape and records seat occupancy.
-3. When at least two seats are valid, Match Service sets match status to `running`.
+3. When at least two seats are valid and a user presses Start, Match Service sets match status to `running`.
 4. Match loop repeatedly simulates hands:
    - Shuffle deck.
    - Execute preflop/flop/turn/river actions via Bot Runner.
@@ -91,7 +91,7 @@ The frontend provides six bot upload slots plus live hand list and hand detail v
 
 ## Security and Isolation
 - Restrict upload size and accepted archive type.
-- Validate expected bot manifest (`bot.json`) and command contract, with legacy `bot.py`/`PokerBot` compatibility during migration.
+- Validate expected bot manifest (`bot.json`) and command contract before the package is accepted.
 - Execute bot actions behind timeout guards.
 - Log bot exceptions and treat them as invalid actions.
 - Future hardening path: container-per-bot sandbox with no network and resource limits.
@@ -142,7 +142,8 @@ This section defines architectural additions for authentication, bot ownership, 
 - `backend/app/services/bot_registry_service.py` - user bot management logic.
 - `backend/app/services/lobby_service.py` - table create/list/open logic.
 - `backend/app/services/leaderboard_service.py` - aggregate metrics and ranking.
-- `backend/app/bots/supervisor.py` - isolated bot process/container execution orchestration.
+- `backend/app/bots/runtime.py` - bot runner entrypoint and timeout/error handling.
+- `backend/app/bots/sandbox.py` - isolated process execution over stdin/stdout JSON.
 - `backend/app/bots/protocol.py` - versioned bot-state payload builders.
 - `frontend/login.html` - login route entrypoint (or SPA login route if existing app shell is adopted).
 - `frontend/my-bots.*` - My Bots page script/style assets.
@@ -202,7 +203,7 @@ This section defines architectural additions for authentication, bot ownership, 
   - per-street hand state from `engine.game`
   - per-action timeline from engine `ActionEvent` stream
 - Output target:
-  - versioned payload for `BotRunner.act(state)` where `state` is either legacy v1 or protocol v2 before being forwarded into the bot transport.
+  - a versioned state payload that is serialized to JSON and sent to the bot process on stdin.
 
 ### v2 Mapping Rules
 - `table.hand_id`, `table.street`, blind values, and button seat map directly from engine round state.
@@ -211,14 +212,10 @@ This section defines architectural additions for authentication, bot ownership, 
 - `legal_actions` is normalized from engine legal-action computation, including min/max bounds when action uses amount.
 - `action_history` is built from full hand action timeline in deterministic index order and includes `pot_after` snapshots.
 
-### Compatibility Rules
-- Version selection:
-  - use `bot.json.protocol_version` for manifest-driven stdio bots;
-  - otherwise use `BOT_PROTOCOL_VERSION` module constant when present;
-  - otherwise use `PokerBot.protocol_version` class attribute when present;
-  - otherwise default to legacy v1 payload for legacy Python bots.
+### Versioning Rules
+- Bots declare their protocol via `bot.json.protocol_version`.
+- Omitted protocol values default to `2.0`.
 - Unsupported protocol declarations fail validation at upload time.
-- Legacy v1 payload shape must remain unchanged while compatibility mode exists.
 
 ### Runtime Limits and Failure Policy
 - Serialized state payload cap: `64KiB` (`65536` bytes).

@@ -13,9 +13,15 @@ from app.engine.game import (
 
 class CheckCallBot:
     def act(self, state: dict) -> dict:
-        if "check" in state.get("legal_actions", []):
+        legal_actions = state.get("legal_actions", [])
+        if legal_actions and isinstance(legal_actions[0], dict):
+            legal = {entry.get("action") for entry in legal_actions}
+        else:
+            legal = set(legal_actions)
+
+        if "check" in legal:
             return {"action": "check"}
-        if "call" in state.get("legal_actions", []):
+        if "call" in legal:
             return {"action": "call"}
         return {"action": "fold"}
 

@@ -9,7 +9,6 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_ARCHIVE_MEMBERS = 128
 MAX_ARCHIVE_FILE_BYTES = 1 * 1024 * 1024
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = 2 * 1024 * 1024
-MAX_BOT_SOURCE_BYTES = 256 * 1024
 
 
 def validate_archive_infos(infos: list[ZipInfo]) -> tuple[bool, str | None]:

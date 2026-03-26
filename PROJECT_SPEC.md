@@ -10,7 +10,7 @@ Users upload bots into Seats 1-6. Once at least two seats are filled, the backen
 
 ## Goals
 - Provide a web UI with six bot upload slots.
-- Automatically start a battle when at least two slots are filled.
+- Let users start a battle from the table UI once at least two slots are filled.
 - Continuously simulate random hands and append them to a hand list.
 - Provide detailed per-hand hand history text in a standard readable format.
 - Run the app in containers for easy VPS deployment.
@@ -27,7 +27,7 @@ Users upload bots into Seats 1-6. Once at least two seats are filled, the backen
 - Single active 2-6 player table.
 - Texas Hold'em No Limit only.
 - Bot upload via web UI to six fixed seats.
-- Backend match loop that runs hands after at least two bots are uploaded.
+- Backend match loop that runs hands after at least two bots are uploaded and the user starts the match.
 - Hand summary list and detailed hand history viewer.
 - Containerized local run and deployable image.
 
@@ -48,7 +48,7 @@ Users upload bots into Seats 1-6. Once at least two seats are filled, the backen
 - `FR-01`: Web UI displays Seat 1-6 upload cards with current status.
 - `FR-02`: Each seat accepts a bot package upload (`.zip`) and shows upload result.
 - `FR-03`: Backend validates upload shape (required manifest/entrypoint and action protocol compatibility).
-- `FR-04`: Match starts automatically when at least two seats contain valid bots.
+- `FR-04`: User can start a match when at least two seats contain valid bots.
 - `FR-05`: Engine runs No-Limit Texas Hold'em hands for 2-6 players with random shuffles.
 - `FR-06`: After each hand, backend stores:
   - hand id
@@ -91,7 +91,6 @@ Runtime behavior:
 - The bot writes a single action JSON object to stdout.
 - Each action call has a timeout (default `2s`).
 - Invalid responses are treated as failed action and resolved safely by engine fallback.
-- Legacy Python `PokerBot.act(state)` archives remain accepted temporarily as a compatibility path.
 
 ## API Surface (MVP)
 - `GET /api/v1/health`
@@ -106,7 +105,7 @@ Runtime behavior:
 
 ## Acceptance Criteria
 - [ ] `AC-01` Opening the web app shows six upload slots and a hand list area.
-- [ ] `AC-02` Uploading valid bot files to at least two seats starts the match automatically.
+- [ ] `AC-02` Uploading valid bot files to at least two seats enables the match to start from the UI.
 - [ ] `AC-03` Completed hands appear in the UI as appended summary rows.
 - [ ] `AC-04` Clicking a hand opens readable `.txt`-style hand history content.
 - [ ] `AC-05` Card dealing is random across consecutive hands.
@@ -177,7 +176,7 @@ This section extends MVP scope for the next implementation batch. Existing MVP r
 - `FR-22`: Leaderboard includes bots that have played historically, not only currently seated bots.
 - `FR-23`: Bot runtime is isolated from API process (separate execution boundary and resource/time limits).
 - `FR-24`: Server sends bots structured table context including player ids, seats, stacks, board, pot, legal actions, and complete prior hand actions.
-- `FR-25`: Bot action interface remains backward compatible where possible, with explicit versioning for new context fields and a legacy adapter for older Python-class bots.
+- `FR-25`: Bot action interface is explicitly versioned via `bot.json.protocol_version` so future protocol revisions can be introduced cleanly.
 - `FR-26`: All new data (users, bots, tables, leaderboard aggregates) is persisted across process restarts.
 - `FR-27`: Authentication for Batch 2 is local username/password only (no OAuth in this batch).
 - `FR-28`: Bot source packages and implementation details are private to owners and never exposed in public APIs.
@@ -197,17 +196,12 @@ This section extends MVP scope for the next implementation batch. Existing MVP r
 - `GET /api/v1/lobby/leaderboard`
 - `POST /api/v1/tables/{table_id}/seats/{seat_id}/bot-select`
 
-## Bot Protocol v2 Contract (M5-T1 Locked)
-### Version Negotiation and Compatibility
+## Bot Protocol v2 Contract (Current)
+### Versioning
 - Primary bot interface is a declared command in `bot.json` that receives one state JSON object on stdin and returns one action JSON object on stdout.
 - Manifest bots declare protocol with `bot.json.protocol_version`; omitted values default to `"2.0"`.
-- Legacy Python bots remain supported temporarily and still opt into v2 by declaring either:
-  - module constant `BOT_PROTOCOL_VERSION = "2.0"`, or
-  - class attribute `PokerBot.protocol_version = "2.0"`.
 - Unsupported protocol values are rejected during upload validation with a clear error.
-- Runtime always sends exactly one schema per call:
-  - v1 bots receive the current legacy `state` shape unchanged.
-  - v2 bots receive the v2 payload described below.
+- Runtime sends the v2 payload described below for every decision call.
 
 ### Required v2 Payload Shape
 All fields below are required unless explicitly marked optional.

@@ -25,7 +25,7 @@ class BotManifest:
 def select_manifest_member(names: list[str]) -> tuple[str | None, str | None]:
     candidates = _select_named_members(names, BOT_MANIFEST_NAME)
     if not candidates:
-        return None, None
+        return None, f"{BOT_MANIFEST_NAME} must exist at zip root or one top-level folder"
     if BOT_MANIFEST_NAME in candidates:
         return BOT_MANIFEST_NAME, None
 

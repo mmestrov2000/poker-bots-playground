@@ -8,110 +8,25 @@ from pathlib import Path
 
 import pytest
 
-from app.bots.loader import (
-    BotLoadError,
-    has_manifest_contract,
-    load_bot_from_zip,
-    prepare_bot_archive,
-    resolve_bot_protocol_from_zip,
-)
+from app.bots.loader import BotLoadError, prepare_bot_archive
 from app.bots.runtime import MAX_STATE_BYTES, BotRunner
 
 
-def _zip_bot(tmp_path: Path, name: str, body: str) -> Path:
-    zip_path = tmp_path / name
-    with zipfile.ZipFile(zip_path, "w") as archive:
-        archive.writestr("bot.py", body)
-    return zip_path
-
-
-def _zip_bot_nested(tmp_path: Path, name: str, body: str) -> Path:
-    zip_path = tmp_path / name
-    with zipfile.ZipFile(zip_path, "w") as archive:
-        archive.writestr("my_bot/bot.py", body)
-    return zip_path
-
-
-def _zip_stdio_bot(tmp_path: Path, name: str, body: str, *, command: list[str] | None = None) -> Path:
+def _zip_stdio_bot(
+    tmp_path: Path,
+    name: str,
+    body: str,
+    *,
+    command: list[str] | None = None,
+    manifest_path: str = "bot.json",
+    script_path: str = "bot.py",
+) -> Path:
     zip_path = tmp_path / name
     manifest = {"command": command or ["python", "bot.py"], "protocol_version": "2.0"}
     with zipfile.ZipFile(zip_path, "w") as archive:
-        archive.writestr("bot.json", json.dumps(manifest))
-        archive.writestr("bot.py", body)
+        archive.writestr(manifest_path, json.dumps(manifest))
+        archive.writestr(script_path, body)
     return zip_path
-
-
-def test_load_bot_from_zip_happy_path(tmp_path: Path) -> None:
-    body = "\n".join(
-        [
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        return {'action': 'check'}",
-        ]
-    )
-    zip_path = _zip_bot(tmp_path, "bot.zip", body)
-
-    bot = load_bot_from_zip(zip_path)
-    assert hasattr(bot, "act")
-
-
-def test_load_bot_from_zip_happy_path_nested_entrypoint(tmp_path: Path) -> None:
-    body = "\n".join(
-        [
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        return {'action': 'check'}",
-        ]
-    )
-    zip_path = _zip_bot_nested(tmp_path, "bot.zip", body)
-
-    bot = load_bot_from_zip(zip_path)
-    assert hasattr(bot, "act")
-
-
-def test_load_bot_from_zip_missing_entrypoint(tmp_path: Path) -> None:
-    zip_path = tmp_path / "bot.zip"
-    with zipfile.ZipFile(zip_path, "w") as archive:
-        archive.writestr("readme.txt", "hello")
-
-    with pytest.raises(BotLoadError, match="bot.py must exist"):
-        load_bot_from_zip(zip_path)
-
-
-def test_load_bot_from_zip_missing_class(tmp_path: Path) -> None:
-    body = "\n".join([
-        "class NotPokerBot:",
-        "    def act(self, state):",
-        "        return {'action': 'check'}",
-    ])
-    zip_path = _zip_bot(tmp_path, "bot.zip", body)
-
-    with pytest.raises(BotLoadError):
-        load_bot_from_zip(zip_path)
-
-
-def test_load_bot_from_zip_rejects_unsafe_archive_path(tmp_path: Path) -> None:
-    zip_path = tmp_path / "bot.zip"
-    with zipfile.ZipFile(zip_path, "w") as archive:
-        archive.writestr("../bot.py", "class PokerBot: pass")
-
-    with pytest.raises(BotLoadError, match="unsafe paths"):
-        load_bot_from_zip(zip_path)
-
-
-def test_resolve_bot_protocol_from_zip_without_importing_bot(tmp_path: Path) -> None:
-    body = "\n".join(
-        [
-            "BOT_PROTOCOL_VERSION = '2.0'",
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        return {'action': 'check'}",
-        ]
-    )
-    zip_path = _zip_bot(tmp_path, "bot.zip", body)
-
-    protocol = resolve_bot_protocol_from_zip(zip_path)
-    assert protocol == "2.0"
 
 
 def test_prepare_bot_archive_happy_path(tmp_path: Path) -> None:
@@ -119,26 +34,49 @@ def test_prepare_bot_archive_happy_path(tmp_path: Path) -> None:
         [
             "import json",
             "import sys",
-            "state = json.load(sys.stdin)",
+            "json.load(sys.stdin)",
             "json.dump({'action': 'check'}, sys.stdout)",
         ]
     )
-    zip_path = _zip_stdio_bot(tmp_path, "stdio.zip", body)
+    zip_path = _zip_stdio_bot(tmp_path, "bot.zip", body)
 
     prepared = prepare_bot_archive(zip_path)
-    assert prepared.protocol_version == "2.0"
     assert prepared.command[0] == "python"
     assert prepared.command[1:] == ("bot.py",)
     assert prepared.working_dir == prepared.extract_dir
 
 
-def test_has_manifest_contract_detects_stdio_bots(tmp_path: Path) -> None:
+def test_prepare_bot_archive_supports_manifest_in_single_top_level_folder(tmp_path: Path) -> None:
+    body = "import json\nimport sys\njson.load(sys.stdin)\njson.dump({'action':'check'}, sys.stdout)\n"
     zip_path = _zip_stdio_bot(
         tmp_path,
-        "stdio.zip",
-        "import json\nimport sys\njson.dump({'action': 'check'}, sys.stdout)\n",
+        "nested.zip",
+        body,
+        manifest_path="my_bot/bot.json",
+        script_path="my_bot/bot.py",
     )
-    assert has_manifest_contract(zip_path) is True
+
+    prepared = prepare_bot_archive(zip_path)
+    assert prepared.working_dir.name == "my_bot"
+    assert prepared.command == ("python", "bot.py")
+
+
+def test_prepare_bot_archive_rejects_missing_manifest(tmp_path: Path) -> None:
+    zip_path = tmp_path / "bot.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("bot.py", "print('hello')")
+
+    with pytest.raises(BotLoadError, match="bot.json must exist"):
+        prepare_bot_archive(zip_path)
+
+
+def test_prepare_bot_archive_rejects_unsafe_archive_path(tmp_path: Path) -> None:
+    zip_path = tmp_path / "bot.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("../bot.json", '{"command":["python","bot.py"],"protocol_version":"2.0"}')
+
+    with pytest.raises(BotLoadError, match="unsafe paths"):
+        prepare_bot_archive(zip_path)
 
 
 def test_bot_runner_timeout_and_error() -> None:
@@ -207,92 +145,6 @@ def test_bot_runner_rejects_invalid_state() -> None:
     assert result.get("error") == "invalid_state"
 
 
-def test_bot_runner_subprocess_contains_crashing_bot(tmp_path: Path) -> None:
-    crash_body = "\n".join(
-        [
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        raise SystemExit(2)",
-        ]
-    )
-    zip_path = _zip_bot(tmp_path, "crash.zip", crash_body)
-
-    runner = BotRunner(
-        seat_id="1",
-        bot_archive_path=zip_path,
-        timeout_seconds=0.2,
-    )
-    result = runner.act({"legal_actions": ["check"]})
-    assert result["action"] == "fold"
-    assert result.get("error", "").startswith("runtime_error:")
-
-
-def test_bot_runner_subprocess_timeout(tmp_path: Path) -> None:
-    hang_body = "\n".join(
-        [
-            "import time",
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        time.sleep(5)",
-            "        return {'action': 'check'}",
-        ]
-    )
-    zip_path = _zip_bot(tmp_path, "hang.zip", hang_body)
-
-    runner = BotRunner(
-        seat_id="1",
-        bot_archive_path=zip_path,
-        timeout_seconds=0.05,
-    )
-    result = runner.act({"legal_actions": ["check"]})
-    assert result["action"] == "fold"
-    assert result.get("error") == "timeout"
-
-
-def test_bot_runner_subprocess_does_not_inherit_host_env(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("PPG_TEST_SECRET_TOKEN", "top-secret")
-    env_body = "\n".join(
-        [
-            "import os",
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        if os.getenv('PPG_TEST_SECRET_TOKEN'):",
-            "            return {'action': 'raise', 'amount': 500}",
-            "        return {'action': 'check'}",
-        ]
-    )
-    zip_path = _zip_bot(tmp_path, "env.zip", env_body)
-
-    runner = BotRunner(
-        seat_id="1",
-        bot_archive_path=zip_path,
-        timeout_seconds=0.2,
-    )
-    result = runner.act({"legal_actions": ["check", "raise"]})
-    assert result["action"] == "check"
-    assert "PPG_TEST_SECRET_TOKEN" in os.environ
-
-
-def test_bot_runner_subprocess_cleans_unpack_directories(tmp_path: Path) -> None:
-    body = "\n".join(
-        [
-            "class PokerBot:",
-            "    def act(self, state):",
-            "        return {'action': 'check'}",
-        ]
-    )
-    zip_path = _zip_bot(tmp_path, "clean.zip", body)
-
-    runner = BotRunner(
-        seat_id="1",
-        bot_archive_path=zip_path,
-        timeout_seconds=0.2,
-    )
-    result = runner.act({"legal_actions": ["check"]})
-    assert result["action"] == "check"
-    assert list(tmp_path.glob("unpacked_*")) == []
-
-
 def test_bot_runner_subprocess_stdio_bot_happy_path(tmp_path: Path) -> None:
     body = "\n".join(
         [
@@ -356,3 +208,50 @@ def test_bot_runner_subprocess_stdio_bot_rejects_bad_stdout(tmp_path: Path) -> N
     result = runner.act({"legal_actions": [{"action": "check"}]})
     assert result["action"] == "fold"
     assert result.get("error") == "runtime_malformed_output"
+
+
+def test_bot_runner_subprocess_stdio_bot_does_not_inherit_host_env(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("PPG_TEST_SECRET_TOKEN", "top-secret")
+    body = "\n".join(
+        [
+            "import json",
+            "import os",
+            "import sys",
+            "json.load(sys.stdin)",
+            "if os.getenv('PPG_TEST_SECRET_TOKEN'):",
+            "    json.dump({'action': 'raise', 'amount': 500}, sys.stdout)",
+            "else:",
+            "    json.dump({'action': 'check'}, sys.stdout)",
+        ]
+    )
+    zip_path = _zip_stdio_bot(tmp_path, "env.zip", body)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.2,
+    )
+    result = runner.act({"legal_actions": [{"action": "check"}, {"action": "raise"}]})
+    assert result["action"] == "check"
+    assert "PPG_TEST_SECRET_TOKEN" in os.environ
+
+
+def test_bot_runner_subprocess_cleans_unpack_directories(tmp_path: Path) -> None:
+    body = "\n".join(
+        [
+            "import json",
+            "import sys",
+            "json.load(sys.stdin)",
+            "json.dump({'action': 'check'}, sys.stdout)",
+        ]
+    )
+    zip_path = _zip_stdio_bot(tmp_path, "clean.zip", body)
+
+    runner = BotRunner(
+        seat_id="1",
+        bot_archive_path=zip_path,
+        timeout_seconds=0.2,
+    )
+    result = runner.act({"legal_actions": [{"action": "check"}]})
+    assert result["action"] == "check"
+    assert list(tmp_path.glob("unpacked_*")) == []

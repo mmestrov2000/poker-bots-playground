@@ -37,8 +37,8 @@ Goal: run valid heads-up NLHE hands between uploaded bots.
 - [x] `M1-T2` Implement legal action validation and bet sizing rules (owner: `feature-agent`)
   - Acceptance: Illegal actions are rejected or normalized by explicit fallback rules.
   - Test Strategy: Unit tests for fold/check/call/bet/raise edge cases.
-- [x] `M1-T3` Implement secure bot loader and `act()` invocation wrapper (owner: `feature-agent`)
-  - Acceptance: Bot class is loaded from upload package; timeout/error handling is enforced.
+- [x] `M1-T3` Implement secure bot package execution wrapper (owner: `feature-agent`)
+  - Acceptance: Uploaded bot package is validated and executed with timeout/error handling.
   - Test Strategy: Unit tests for valid bot, timeout bot, exception bot, malformed bot.
 - [x] `M1-T4` Integrate match loop to produce completed hand records (owner: `feature-agent`)
   - Acceptance: With two bots loaded, loop generates sequential hand ids and results.
@@ -208,7 +208,7 @@ Goal: run bots in stronger isolation while providing complete table/player/actio
 - [x] `M5-T1` Define protocol-v2 bot context schema and compatibility contract (owner: `main-agent`)
   - Subtasks:
   - Specify required context fields: player ids, seat map, stacks, pot, board, legal actions, prior actions. Done in `PROJECT_SPEC.md` (Bot Protocol v2 Contract) and `ARCHITECTURE.md` (Protocol v2 Architecture Contract).
-  - Define versioning and backward compatibility behavior for legacy bots. Done: explicit v2 opt-in (`BOT_PROTOCOL_VERSION` / `PokerBot.protocol_version`), legacy-v1 default, and upload-time rejection for unsupported versions.
+  - Define versioning behavior for declared bot protocols. Done: `bot.json.protocol_version` selects protocol v2 and unsupported versions are rejected at upload time.
   - Document context size/timeout constraints. Done: `64KiB` serialized payload cap and `2.0s` decision timeout documented.
   - Acceptance: Protocol schema is precise enough for backend and bot-template implementation.
   - Test Strategy: Schema review against existing bot contract and engine state availability.
@@ -243,7 +243,7 @@ Goal: run bots in stronger isolation while providing complete table/player/actio
 - [x] `M5-T6` Review Milestone 5 for sandbox and compatibility risks (owner: `review-agent`)
   - Subtasks:
   - Validate isolation boundary and guardrail enforcement paths. Done: reviewed `BotRunner`/sandbox flow and fixed env-leak + extract-dir cleanup regressions.
-  - Validate legacy bot fallback/compatibility behavior. Done: verified protocol selection and fallback behavior across `backend/app/bots/protocol.py` and existing adapter/runtime tests.
+  - Validate declared-protocol execution behavior. Done: verified manifest parsing, protocol selection, and failure handling across `backend/app/bots/protocol.py` and adapter/runtime tests.
   - Validate protocol docs match runtime implementation. Done: compared `PROJECT_SPEC.md`, `ARCHITECTURE.md`, template docs, and runtime payload generation/tests.
   - Acceptance: No unresolved critical isolation/security issues remain.
   - Test Strategy: Review-driven targeted rerun of isolation and protocol tests.
@@ -360,13 +360,19 @@ Goal: upgrade the full static frontend into a premium poker-arena experience wit
   - Test Strategy: `npm run test:e2e` after `npm install` and `npx playwright install chromium`.
 
 ## Feature: Stdio Bot Runtime Contract
-Goal: make bot execution explicitly process-based by running declared commands over stdin/stdout JSON while keeping a temporary legacy bridge for older Python class bots.
+Goal: make bot execution explicitly process-based by running declared commands over stdin/stdout JSON.
 
 - [x] `FSTDIO-T1` Implement manifest-driven stdio bot execution and update docs/tests (owner: `feature-agent`)
   - Subtasks:
   - Add `bot.json` manifest parsing/validation with command-array execution support. Done in `backend/app/bots/manifest.py`, `backend/app/bots/validator.py`, and `backend/app/bots/loader.py`.
   - Execute manifest bots through the sandbox over stdin/stdout JSON without touching engine action resolution. Done in `backend/app/bots/sandbox.py` and `backend/app/bots/runtime.py`.
-  - Keep legacy `PokerBot.act()` uploads working as a compatibility fallback during migration. Done via manifest-first detection with legacy loader fallback in bot validation/runtime.
   - Update starter template, primary docs, and regression coverage for the new contract. Done in `bot_template/`, `README.md`, `PROJECT_SPEC.md`, `ARCHITECTURE.md`, and backend tests.
   - Acceptance: newly uploaded manifest bots run through the existing match loop with the current v2 payload, and malformed manifest/runtime failures degrade safely.
   - Test Strategy: targeted backend `pytest` for bot runtime, protocol validation, match service, API uploads, and template smoke behavior.
+- [x] `FSTDIO-T2` Remove legacy bot compatibility paths and publish participant-ready bot guide (owner: `feature-agent`)
+  - Subtasks:
+  - Remove remaining legacy loader/runtime/docs references so the manifest-driven stdio contract is the only supported path. Done across `backend/app/bots/`, docs, and tests.
+  - Add a step-by-step participant guide for building, testing, packaging, and uploading a bot. Done in `docs/build-a-poker-bot.md`.
+  - Refresh the top-level repo README so GitHub visitors can immediately find the bot guide, template, examples, and local run instructions. Done in `README.md`.
+  - Acceptance: the repo presents one clear bot workflow end-to-end, with no user-facing legacy contract references left.
+  - Test Strategy: repo-wide doc/reference search plus backend regression suite.

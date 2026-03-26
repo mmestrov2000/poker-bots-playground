@@ -9,8 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from app.bots.protocol import LEGACY_PROTOCOL_VERSION
-
 
 _EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="bot-runner")
 MAX_STATE_BYTES = 64 * 1024
@@ -24,7 +22,6 @@ class BotRunner:
     bot_archive_path: Path | None = None
     timeout_seconds: float = 2.0
     memory_limit_bytes: int = DEFAULT_MEMORY_LIMIT_BYTES
-    protocol_version: str = LEGACY_PROTOCOL_VERSION
 
     def act(self, state: dict) -> dict:
         try:

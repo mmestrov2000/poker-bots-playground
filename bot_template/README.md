@@ -2,12 +2,16 @@
 
 Your bot is a ZIP package that declares how to run itself and communicates over stdin/stdout JSON.
 
+If you want a guided walkthrough, read [../docs/build-a-poker-bot.md](../docs/build-a-poker-bot.md) first.
+
 ## Package layout
 
 This folder contains the minimum working package:
 
 - `bot.json` declares the command the server should run
 - `bot.py` reads one decision state JSON object from stdin and writes one action JSON object to stdout
+- `examples/` contains readable sample bots
+- `bots/` contains upload-ready ZIP files built from those examples
 
 `bot.json`:
 

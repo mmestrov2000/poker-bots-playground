@@ -450,7 +450,6 @@ class PokerEngine:
             to_call = current_bet_ref[0] - bets[seat]
             legal = legal_actions(to_call=to_call, stack=stacks[seat], current_bet=current_bet_ref[0])
             state = build_decision_state(
-                protocol_version=bots[seat].protocol_version,
                 table_id=table_id,
                 hand_id=hand_id,
                 seat=seat,
@@ -795,4 +794,3 @@ def evaluate_five_card_hand(cards: Iterable[Card]) -> tuple:
         kickers = sorted([rank for rank, count in counts.items() if count == 1], reverse=True)
         return (1, [ordered_ranks[0]] + kickers)
     return (0, ranks)
-

@@ -10,12 +10,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from app.bots.loader import (
-    BotLoadError,
-    has_manifest_contract,
-    load_bot_from_zip,
-    prepare_bot_archive,
-)
+from app.bots.loader import BotLoadError, prepare_bot_archive
 
 
 def _parse_args() -> argparse.Namespace:
@@ -37,7 +32,7 @@ def _parse_args() -> argparse.Namespace:
         "--timeout-seconds",
         type=float,
         default=2.0,
-        help="Per-decision wall-clock timeout used for stdio bot commands",
+        help="Per-decision wall-clock timeout used for bot commands",
     )
     return parser.parse_args()
 
@@ -54,25 +49,7 @@ def _set_resource_limits(memory_limit_bytes: int, cpu_seconds: int) -> None:
         resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
 
 
-def _run_legacy(bot_zip: Path, state: dict[str, Any]) -> dict[str, Any]:
-    extract_dir: str | None = None
-    try:
-        bot = load_bot_from_zip(bot_zip)
-        extract_path = getattr(bot, "_ppg_extract_dir", None)
-        if isinstance(extract_path, str):
-            extract_dir = extract_path
-        result = bot.act(state)
-        return {"result": result}
-    except BotLoadError as exc:
-        return {"error": f"load_error:{exc}"}
-    except BaseException as exc:  # noqa: BLE001 - sandbox contains arbitrary bot failures
-        return {"error": f"runtime_error:{exc.__class__.__name__}"}
-    finally:
-        if extract_dir:
-            shutil.rmtree(extract_dir, ignore_errors=True)
-
-
-def _run_stdio(bot_zip: Path, state: dict[str, Any], timeout_seconds: float) -> dict[str, Any]:
+def _run(bot_zip: Path, state: dict[str, Any], timeout_seconds: float) -> dict[str, Any]:
     prepared = None
     process: subprocess.Popen[bytes] | None = None
     try:
@@ -112,12 +89,6 @@ def _run_stdio(bot_zip: Path, state: dict[str, Any], timeout_seconds: float) -> 
             _kill_process_group(process)
         if prepared is not None:
             shutil.rmtree(prepared.extract_dir, ignore_errors=True)
-
-
-def _run(bot_zip: Path, state: dict[str, Any], timeout_seconds: float) -> dict[str, Any]:
-    if has_manifest_contract(bot_zip):
-        return _run_stdio(bot_zip, state, timeout_seconds)
-    return _run_legacy(bot_zip, state)
 
 
 def _kill_process_group(process: subprocess.Popen[bytes]) -> None:

@@ -18,7 +18,6 @@ def _build_v2_state(
     actions: list[ActionEvent] | None = None,
 ) -> dict:
     return build_decision_state(
-        protocol_version=PROTOCOL_V2,
         table_id="table-1",
         hand_id=hand_id,
         seat="2",

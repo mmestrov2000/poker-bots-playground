@@ -8,11 +8,11 @@
   </head>
   <body data-page="table-detail">
     <main id="app-shell" class="layout shell-page" aria-live="polite">
-      <header class="app-header surface-panel">
+      <header class="app-header shell-strip">
         <div class="app-brand">
           <p class="panel-eyebrow">Poker Bots Playground</p>
-          <h1>Table Detail</h1>
-          <p>Seat bots, run matches, and review hand history without leaving the live arena.</p>
+          <h1>Table</h1>
+          <p>Seat bots, run the match, and inspect history from one live workspace.</p>
         </div>
         <nav class="app-nav" aria-label="Primary">
           <a id="nav-lobby" data-nav="lobby" href="/lobby">Lobby</a>
@@ -21,12 +21,12 @@
         </nav>
       </header>
 
-      <section class="page-intro surface-panel page-intro-table">
+      <section class="page-intro page-hero page-intro-table">
         <div>
           <p class="panel-eyebrow">Live Arena</p>
-          <h2>Run a responsive 6-max table from one screen.</h2>
+          <h2>Keep the live table readable while everything updates.</h2>
           <p class="page-intro-copy">
-            Desktop keeps the felt-focused layout; smaller screens switch to readable stacked seat cards and compact control groups.
+            The table stays central on larger screens, while mobile collapses into a clear stacked flow instead of forcing tiny panels and cramped controls.
           </p>
         </div>
         <div class="page-intro-metrics">
@@ -39,18 +39,18 @@
 
       <section class="arena-layout">
         <div class="arena-stage">
-          <section class="table-area surface-panel">
+          <section class="table-area section-shell">
             <div class="panel-header panel-header-tight">
               <div>
                 <p class="panel-eyebrow">Arena</p>
-                <h2>Premium table view</h2>
+                <h2>Live table</h2>
               </div>
             </div>
 
             <div class="poker-table" data-testid="poker-table">
               <div class="table-center">
-                <p class="table-center-eyebrow">Premium Arena</p>
-                <h2 class="table-center-title">6-Max NLH Arena</h2>
+                <p class="table-center-eyebrow">Live Table</p>
+                <h2 class="table-center-title">6-Max NLH</h2>
                 <div class="table-center-meta">
                   <span id="table-center-status">Waiting</span>
                   <span id="table-center-hands">0 hands played</span>
@@ -125,11 +125,11 @@
             </div>
           </section>
 
-          <section class="match-controls surface-panel">
+          <section class="match-controls section-shell">
             <div class="panel-header">
               <div>
                 <p class="panel-eyebrow">Match Controls</p>
-                <h2>Control live play</h2>
+                <h2>Run the match</h2>
               </div>
             </div>
             <div class="match-buttons">
@@ -146,7 +146,7 @@
           </section>
         </div>
 
-        <aside class="pnl-panel surface-panel">
+        <aside class="pnl-panel section-shell">
           <div class="panel-header">
             <div>
               <p class="panel-eyebrow">Standings</p>
@@ -171,11 +171,11 @@
       </section>
 
       <section class="history-grid">
-        <section class="history-panel surface-panel">
+        <section class="history-panel section-shell">
           <div class="panel-header">
             <div>
               <p class="panel-eyebrow">Timeline</p>
-              <h2>Hands Played</h2>
+              <h2>Recent Hands</h2>
             </div>
             <button id="hand-history-button" type="button" data-testid="hand-history-button">Hand History</button>
           </div>
@@ -199,7 +199,7 @@
           </div>
         </section>
 
-        <section class="history-panel surface-panel">
+        <section class="history-panel section-shell">
           <div class="panel-header">
             <div>
               <p class="panel-eyebrow">Detail</p>

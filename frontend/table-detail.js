@@ -22,6 +22,7 @@
   let pnlVisibility = {};
   let activeSeatId = null;
   let myBotsCache = [];
+  let currentHands = [];
   let seatAssignmentBusy = false;
   let stateRefreshInFlight = false;
   let refreshErrorNotified = false;
@@ -627,6 +628,7 @@
     if (!list) {
       return;
     }
+    currentHands = hands.slice();
     list.innerHTML = "";
 
     if (!hands.length) {
@@ -642,6 +644,7 @@
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = hand.summary;
+      button.classList.toggle("is-active", hand.hand_id === selectedHandId);
       button.addEventListener("click", () => openHand(hand.hand_id));
       item.appendChild(button);
       list.appendChild(item);
@@ -714,6 +717,9 @@
     const hand = await window.AppShell.request(tableApiPath(`/hands/${encodeURIComponent(handId)}`));
     selectedHandId = handId;
     handDetailText = hand.history || "No hand history available.";
+    if (currentHands.length) {
+      renderHands(currentHands);
+    }
     setHandDetailMode("logs");
   }
 
@@ -729,6 +735,7 @@
     handsPage = 1;
     handsTotalHands = 0;
     handsTotalPages = 0;
+    currentHands = [];
     currentHandsSignature = "";
     const list = document.getElementById("hands-list");
     if (list) {

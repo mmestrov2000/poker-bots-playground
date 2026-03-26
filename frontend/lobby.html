@@ -8,11 +8,11 @@
   </head>
   <body data-page="lobby">
     <main id="app-shell" class="layout shell-page" aria-live="polite">
-      <header class="app-header surface-panel">
+      <header class="app-header shell-strip">
         <div class="app-brand">
           <p class="panel-eyebrow">Poker Bots Playground</p>
           <h1>Lobby</h1>
-          <p>Spin up new tables, scan the global leaderboard, and jump into live play from any device.</p>
+          <p>Create tables, scan the field, and get back into live play without wading through extra chrome.</p>
         </div>
         <nav class="app-nav" aria-label="Primary">
           <a id="nav-lobby" data-nav="lobby" href="/lobby">Lobby</a>
@@ -21,12 +21,12 @@
         </nav>
       </header>
 
-      <section class="page-intro surface-panel">
+      <section class="page-intro page-hero">
         <div>
           <p class="panel-eyebrow">Control Center</p>
-          <h2>Create tables and monitor field performance.</h2>
+          <h2>See what matters, then open the right table.</h2>
           <p class="page-intro-copy">
-            Responsive cards replace cramped mobile tables, while desktop keeps fast-scan metadata for frequent table switching.
+            Table creation stays close at hand, the leaderboard stays secondary, and the live table list remains easy to scan across screen sizes.
           </p>
         </div>
         <div class="page-intro-metrics">
@@ -37,7 +37,7 @@
       </section>
 
       <section class="lobby-grid">
-        <section class="lobby-panel surface-panel" aria-labelledby="create-table-title">
+        <section class="lobby-panel section-shell" aria-labelledby="create-table-title">
           <div class="panel-header">
             <div>
               <p class="panel-eyebrow">New Arena</p>
@@ -56,7 +56,7 @@
           <p id="create-table-feedback" class="lobby-feedback hidden" role="status"></p>
         </section>
 
-        <section class="lobby-panel surface-panel" aria-labelledby="lobby-leaderboard-title">
+        <section class="lobby-panel section-shell" aria-labelledby="lobby-leaderboard-title">
           <div class="panel-header">
             <div>
               <p class="panel-eyebrow">All-Time Form</p>
@@ -69,7 +69,7 @@
         </section>
       </section>
 
-      <section class="lobby-panel surface-panel" aria-labelledby="lobby-tables-title">
+      <section class="lobby-panel section-shell" aria-labelledby="lobby-tables-title">
         <div class="panel-header">
           <div>
             <p class="panel-eyebrow">Live Tables</p>
